@@ -78,4 +78,19 @@ contextBridge.exposeInMainWorld('api', {
   closeWindow: () => ipcRenderer.send('window-close'),
   setZoom: (factor: number) => ipcRenderer.send('window-set-zoom', factor),
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  onUpdateAvailable: (callback: (info: any) => void) => {
+    const subscription = (_event: any, info: any) => callback(info);
+    ipcRenderer.on('update-available', subscription);
+    return () => ipcRenderer.removeListener('update-available', subscription);
+  },
+  onUpdateProgress: (callback: (progress: any) => void) => {
+    const subscription = (_event: any, progress: any) => callback(progress);
+    ipcRenderer.on('update-progress', subscription);
+    return () => ipcRenderer.removeListener('update-progress', subscription);
+  },
+  onUpdateDownloaded: (callback: (info: any) => void) => {
+    const subscription = (_event: any, info: any) => callback(info);
+    ipcRenderer.on('update-downloaded', subscription);
+    return () => ipcRenderer.removeListener('update-downloaded', subscription);
+  },
 });

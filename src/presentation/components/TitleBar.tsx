@@ -8,6 +8,11 @@ interface TitleBarProps {
 const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
   const [title, setTitle] = useState('SDG CONTROLE');
   const [isOnline, setIsOnline] = useState(false);
+  const [updateStatus, setUpdateStatus] = useState<{
+    type: 'idle' | 'available' | 'downloading' | 'ready',
+    progress?: number,
+    version?: string
+  }>({ type: 'idle' });
 
   useEffect(() => {
     const updateStatus = async () => {
@@ -18,8 +23,31 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
     };
 
     updateStatus();
-    const interval = setInterval(updateStatus, 5000); // Atualiza a cada 5 segundos
-    return () => clearInterval(interval);
+    const interval = setInterval(updateStatus, 5000);
+
+    // Listeners de Atualização
+    const unAvailable = window.api.onUpdateAvailable((info) => {
+      setUpdateStatus({ type: 'available', version: info.version });
+    });
+
+    const unProgress = window.api.onUpdateProgress((progress) => {
+      setUpdateStatus(prev => ({ 
+        ...prev, 
+        type: 'downloading', 
+        progress: progress.percent 
+      }));
+    });
+
+    const unDownloaded = window.api.onUpdateDownloaded((info) => {
+      setUpdateStatus({ type: 'ready', version: info.version });
+    });
+
+    return () => {
+      clearInterval(interval);
+      unAvailable();
+      unProgress();
+      unDownloaded();
+    };
   }, []);
 
   return (
@@ -45,6 +73,32 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
             {isOnline ? 'Sincronização Ativa' : 'Modo Offline'}
           </span>
         </div>
+
+        {/* Barra de Progresso de Atualização */}
+        {updateStatus.type !== 'idle' && (
+          <div className="flex items-center gap-3 ml-4 px-3 py-1 bg-slate-800/50 rounded-full border border-slate-700/50 animate-in fade-in slide-in-from-left-2">
+            <i className={clsx(
+              "ph text-sm",
+              updateStatus.type === 'downloading' ? "ph-download-simple animate-bounce" : "ph-sparkle text-brand-400"
+            )}></i>
+            
+            <div className="flex flex-col">
+              <span className="text-[9px] font-black uppercase tracking-tighter leading-none">
+                {updateStatus.type === 'available' && `Nova Versão ${updateStatus.version}`}
+                {updateStatus.type === 'downloading' && `Baixando... ${Math.round(updateStatus.progress || 0)}%`}
+                {updateStatus.type === 'ready' && 'Atualização Pronta!'}
+              </span>
+              {updateStatus.type === 'downloading' && (
+                <div className="w-24 h-1 bg-slate-700 rounded-full mt-1 overflow-hidden">
+                  <div 
+                    className="h-full bg-brand-500 transition-all duration-300" 
+                    style={{ width: `${updateStatus.progress}%` }}
+                  ></div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
       
       <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as any}>

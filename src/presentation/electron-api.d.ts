@@ -52,6 +52,9 @@ export interface ElectronAPI {
   closeWindow: () => void;
   setZoom: (factor: number) => void;
   checkForUpdates: () => Promise<any>;
+  onUpdateAvailable: (callback: (info: any) => void) => () => void;
+  onUpdateProgress: (callback: (progress: any) => void) => () => void;
+  onUpdateDownloaded: (callback: (info: any) => void) => () => void;
 }
 
 declare global {

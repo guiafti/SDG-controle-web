@@ -928,11 +928,22 @@ ipcMain.handle('check-for-updates', async () => {
   }
 });
 
-autoUpdater.on('update-available', () => {
-  console.log('[UPDATE] Atualização disponível.');
+autoUpdater.on('update-available', (info) => {
+  console.log('[UPDATE] Atualização disponível:', info.version);
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-available', info);
 });
 
-autoUpdater.on('update-downloaded', () => {
+autoUpdater.on('download-progress', (progressObj) => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-progress', progressObj);
+});
+
+autoUpdater.on('update-downloaded', (info) => {
+  console.log('[UPDATE] Download concluído:', info.version);
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-downloaded', info);
+  
   dialog.showMessageBox({
     type: 'info',
     title: 'Atualização Pronta',
