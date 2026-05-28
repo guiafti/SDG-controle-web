@@ -1,6 +1,6 @@
 {
   "name": "pdv-grupo-import",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "main": "dist/main/main.js",
   "description": "Sistema de PDV Desktop Offline-first",
   "repository": {
@@ -25,7 +25,6 @@
         "provider": "github",
         "owner": "Marcelaun",
         "repo": "sdg-releases",
-        "draft": false,
         "releaseType": "release"
       }
     ],
