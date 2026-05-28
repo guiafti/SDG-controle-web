@@ -24,4 +24,6 @@ jobs:
       - name: Build and Publish
         env:
           GH_TOKEN: ${{ secrets.GH_RELEASES_TOKEN }}
+          GH_OWNER: Marcelaun
+          GH_REPO: sdg-releases
         run: npm run dist -- --publish always
