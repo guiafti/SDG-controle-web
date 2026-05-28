@@ -23,7 +23,9 @@ jobs:
 
       - name: Build and Publish
         env:
+          # Token com permissão 'repo' e 'workflow'
           GH_TOKEN: ${{ secrets.GH_RELEASES_TOKEN }}
-          GH_OWNER: Marcelaun
-          GH_REPO: sdg-releases
-        run: npm run dist -- --publish always
+        # Força o electron-builder a publicar no repo público independente de onde o código está
+        run: |
+          $env:PUBLISH_FORCED = "true"
+          npm run dist -- --publish always -c.publish.provider=github -c.publish.owner=Marcelaun -c.publish.repo=sdg-releases
