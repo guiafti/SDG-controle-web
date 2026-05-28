@@ -1,6 +1,6 @@
 {
   "name": "pdv-grupo-import",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "main": "dist/main/main.js",
   "description": "Sistema de PDV Desktop Offline-first",
   "repository": {

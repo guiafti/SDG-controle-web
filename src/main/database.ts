@@ -285,22 +285,9 @@ export const initDatabase = async () => {
 
   console.log('[BANCO] Sincronização concluída.');
 
-  const storeCount: any = database.prepare('SELECT count(*) as count FROM stores').get();
-  if (storeCount.count === 0) {
-    database.prepare("INSERT INTO stores (id, name) VALUES ('1', 'Loja Centro'), ('2', 'Loja Avenida'), ('3', 'Loja Shopping')").run();
-  }
-
   const userCount: any = database.prepare('SELECT count(*) as count FROM users').get();
   if (userCount.count === 0) {
     database.prepare('INSERT INTO users (id, name, password, role) VALUES (?, ?, ?, ?)').run(randomUUID(), 'Admin', 'admin', 'admin');
-  }
-
-  const categoryCount: any = database.prepare('SELECT count(*) as count FROM expense_categories').get();
-  if (categoryCount.count === 0) {
-    const categories = ['ESTOQUE', 'ALUGUEL', 'ENERGIA', 'ÁGUA', 'INTERNET', 'SALÁRIOS', 'MARKETING', 'MANUTENÇÃO', 'OUTROS'];
-    for (const cat of categories) {
-      database.prepare('INSERT INTO expense_categories (id, name) VALUES (?, ?)').run(randomUUID(), cat);
-    }
   }
 
   // --- CONFIGURAÇÃO AUTOMÁTICA DA IMPRESSORA KNUP ---
