@@ -1,0 +1,302 @@
+import React, { useState, useEffect } from 'react';
+
+interface DashboardProps {
+  onNavigate?: (view: string) => void;
+  onTaskClick?: (task: any) => void;
+  userRole?: string;
+}
+
+const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onTaskClick, userRole }) => {
+  const [syncStatus, setSyncStatus] = useState({ pending: 0, total: 0 });
+  const [stats, setStats] = useState({ totalRevenue: 0, monthlyRevenue: 0, dailyRevenue: 0 });
+  const [lowStockItems, setLowStockItems] = useState<any[]>([]);
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [expandedSection, setExpandedId] = useState<string | null>(null);
+
+  const birthdays = [
+    { name: 'Ricardo (Técnico)', date: '05/05', role: 'Equipe' },
+    { name: 'Loja Almenara Cell', date: '08/05', role: 'Parceiro' },
+    { name: 'Maria Silva', date: '12/05', role: 'Equipe' }
+  ];
+
+  const bills = [
+    { desc: 'Aluguel Loja Shopping', value: 2500, due: '05/05', status: 'pending' },
+    { desc: 'Fornecedor Películas SP', value: 1200, due: '07/05', status: 'urgent' },
+    { desc: 'Internet Matriz', value: 150, due: '10/05', status: 'pending' }
+  ];
+
+  const fetchData = async () => {
+    try {
+      const [sStatus, dStats, lowStock, tData] = await Promise.all([
+        window.api.getSyncStatus(),
+        window.api.getDashboardStats(),
+        window.api.getLowStockItems(),
+        window.api.getTasks()
+      ]);
+      setSyncStatus(sStatus || { pending: 0, total: 0 });
+      setStats({ ...dStats, dailyRevenue: (dStats?.monthlyRevenue || 0) / 22 }); 
+      setLowStockItems(lowStock || []);
+      setTasks(tData || []);
+
+      setAlerts([
+        { id: 1, type: 'warranty', title: 'Retorno de Garantia', desc: 'iPhone 13 - Tela piscando', date: 'Hoje' },
+      ]);
+    } catch (e) { console.error(e); }
+  };
+
+  useEffect(() => {
+    fetchData();
+    const interval = setInterval(fetchData, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const pendingTasks = tasks.filter(t => t.status === 'pending');
+
+  return (
+    <section id="view-dashboard" className="view-section active p-4 md:p-6 max-w-7xl mx-auto w-full font-sans space-y-6 animate-in fade-in duration-500 pb-20">
+      
+      {/* Central Command Header: Daily Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-slate-900 rounded-2xl shadow-xl p-5 flex flex-col justify-center relative overflow-hidden group">
+          <div className="absolute -right-4 -top-4 text-white/5 group-hover:scale-110 transition-transform">
+            <i className="ph ph-currency-dollar text-8xl"></i>
+          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-black text-brand-400 uppercase tracking-[0.2em] mb-1">Vendas Hoje</p>
+            <h3 className="text-3xl font-bold text-white tracking-tight font-mono">
+              {stats.dailyRevenue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+            </h3>
+            <div className="mt-2 flex items-center gap-1.5 text-emerald-400 font-bold text-[9px] uppercase">
+              <i className="ph ph-trend-up"></i> 
+              <span>+12% Estimado</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col justify-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Pendências Globais</p>
+          <div className="flex items-baseline gap-2">
+            <span className="text-3xl font-bold text-slate-800 tracking-tighter">{(syncStatus.pending || 0) + pendingTasks.length}</span>
+            <span className="text-slate-400 font-bold text-xs uppercase">Ações</span>
+          </div>
+          <div className="mt-2 flex gap-2">
+            <span className="px-1.5 py-0.5 bg-brand-50 text-brand-600 rounded text-[8px] font-black uppercase">{pendingTasks.length} Missões</span>
+            <span className="px-1.5 py-0.5 bg-red-50 text-red-600 rounded text-[8px] font-black uppercase">{(syncStatus.pending || 0)} Sinc.</span>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col justify-center relative overflow-hidden">
+          <div className="absolute -right-2 -bottom-2 text-slate-50">
+            <i className="ph ph-cloud-check text-7xl"></i>
+          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Status da Rede</p>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]"></div>
+              <span className="text-sm font-bold text-slate-700 uppercase tracking-tight">Rede Online</span>
+            </div>
+            <p className="text-[9px] font-medium text-slate-400 mt-2 italic">Lojas sincronizadas com a nuvem</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5 flex flex-col justify-center">
+          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">Produtividade</p>
+          <div className="flex items-baseline gap-1">
+            <span className="text-3xl font-bold text-slate-800 tracking-tighter">92%</span>
+            <div className="w-24 h-1.5 bg-slate-100 rounded-full ml-3 overflow-hidden">
+              <div className="h-full bg-brand-500 w-[92%]"></div>
+            </div>
+          </div>
+          <p className="text-[9px] font-bold text-slate-400 uppercase mt-2">Nível de Eficiência Operacional</p>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        {/* Coluna Esquerda: Missões e Aniversariantes */}
+        <div className="lg:col-span-4 space-y-4">
+          <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6 space-y-4 relative overflow-hidden">
+            <div className="flex items-center justify-between border-b border-slate-50 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-brand-50 rounded-xl flex items-center justify-center text-brand-600 shadow-sm">
+                  <i className="ph ph-shield-check text-2xl"></i>
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic">Missões Ativas</h3>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Controle de Tarefas da Rede</p>
+                </div>
+              </div>
+              {userRole === 'admin' && (
+                <button 
+                  onClick={() => onNavigate?.('network')}
+                  className="w-8 h-8 bg-brand-500 text-white rounded-lg flex items-center justify-center shadow-lg hover:bg-brand-600 transition-all active:scale-95"
+                  title="Nova Missão"
+                >
+                  <i className="ph ph-plus font-bold"></i>
+                </button>
+              )}
+            </div>
+            
+            <div className="space-y-3 max-h-[300px] overflow-y-auto pr-1 custom-scrollbar">
+              {pendingTasks.length === 0 ? (
+                <div className="py-10 text-center opacity-30 italic text-[10px]">Nenhuma missão pendente hoje.</div>
+              ) : pendingTasks.map((t, i) => (
+                <div 
+                  key={i} 
+                  onClick={() => onTaskClick ? onTaskClick(t) : onNavigate?.(userRole === 'admin' ? 'network' : 'processes')}
+                  className="flex gap-3 p-3 bg-slate-50 rounded-2xl border border-slate-100 hover:border-brand-500 transition-all cursor-pointer group"
+                >
+                  <div className="w-1 h-auto bg-brand-500 rounded-full"></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[11px] text-slate-700 font-bold uppercase truncate">{t.title}</p>
+                    <p className="text-[8px] text-slate-400 font-black uppercase mt-1 italic">Prazo: {t.due_date || 'Imediato'}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <button 
+              onClick={() => onNavigate?.(userRole === 'admin' ? 'network' : 'processes')}
+              className="w-full py-2.5 bg-slate-900 text-white rounded-xl font-bold uppercase text-[9px] tracking-widest hover:bg-black transition-all"
+            >
+              Gestão de Tarefas
+            </button>
+          </div>
+
+          {/* Social: Aniversariantes - Expandable */}
+          <div className={`bg-white rounded-3xl border border-slate-100 shadow-sm transition-all duration-500 overflow-hidden ${expandedSection === 'bday' ? 'max-h-[600px]' : 'max-h-[85px]'}`}>
+            <div className="p-5 flex justify-between items-center cursor-pointer bg-slate-50/30" onClick={() => setExpandedId(expandedSection === 'bday' ? null : 'bday')}>
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 bg-brand-50 rounded-lg flex items-center justify-center text-brand-500">
+                  <i className="ph ph-cake text-xl"></i>
+                </div>
+                <div>
+                  <h3 className="text-[10px] font-black text-slate-800 uppercase italic leading-none mb-1">Aniversariantes</h3>
+                  <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest">Parabéns aos envolvidos</p>
+                </div>
+              </div>
+              <i className="ph ph-caret-down text-slate-400 transition-transform" style={{ transform: expandedSection === 'bday' ? 'rotate(180deg)' : 'rotate(0deg)' }}></i>
+            </div>
+            <div className="p-4 pt-0 space-y-2">
+              {birthdays.map((b, i) => (
+                <div key={i} className="flex items-center justify-between p-3 bg-slate-50 rounded-2xl border border-slate-100 group hover:bg-white hover:border-brand-200 transition-all">
+                  <div className="flex items-center gap-3">
+                    <div className="w-7 h-7 rounded-full bg-brand-100 flex items-center justify-center text-[10px] font-bold text-brand-600">
+                      {b.name.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-bold text-slate-700 uppercase">{b.name}</p>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase tracking-tight">{b.role}</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono font-black text-brand-500 bg-white px-2 py-1 rounded-lg border border-slate-100">{b.date}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Monitor de Operação Crítica */}
+        <div className="lg:col-span-8 space-y-4">
+          <div className="bg-white rounded-[2rem] border border-slate-100 shadow-sm overflow-hidden flex flex-col h-full">
+            <div className="bg-slate-50/80 p-4 px-8 flex justify-between items-center border-b border-slate-100">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-white border border-slate-200 rounded-xl flex items-center justify-center text-red-500 shadow-sm">
+                  <i className="ph ph-warning-octagon text-2xl"></i>
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-slate-800 uppercase italic">Operação Crítica</h3>
+                  <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest">Resumo de Problemas Detectados na Rede</p>
+                </div>
+              </div>
+              <span className="px-4 py-1.5 bg-red-50 text-red-600 rounded-full text-[9px] font-black uppercase animate-pulse border border-red-100">Monitorando 4 Lojas</span>
+            </div>
+
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-10 flex-1">
+              
+              {/* Alertas Reposição */}
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <i className="ph ph-package text-brand-500"></i> Reposição Necessária
+                </h4>
+                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-3 custom-scrollbar">
+                  {lowStockItems.length === 0 ? (
+                    <p className="text-[10px] text-slate-300 italic text-center py-10">Nenhum item em nível crítico.</p>
+                  ) : lowStockItems.slice(0, 5).map((item, i) => (
+                    <div key={i} className="p-3 bg-white border border-slate-100 rounded-2xl flex justify-between items-center hover:border-brand-200 transition-all group">
+                      <div className="min-w-0">
+                        <span className="text-[11px] font-bold text-slate-700 uppercase truncate block leading-none group-hover:text-brand-600 transition-colors">{item.name}</span>
+                        <span className="text-[8px] font-mono text-slate-400 mt-1.5 block">#{item.barcode}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="text-[8px] font-black text-red-500 bg-red-50 px-2 py-0.5 rounded uppercase">CRÍTICO</span>
+                        <span className="text-xs font-bold text-slate-800 font-mono">{Object.values(item.stocks || {}).reduce((a: any, b: any) => a + b, 0)} un</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Vencimentos e Problemas */}
+              <div className="space-y-6">
+                {/* Contas da Semana - Expandable Card */}
+                <div className={`bg-slate-50/50 rounded-3xl border border-slate-100 transition-all duration-500 overflow-hidden ${expandedSection === 'bills' ? 'max-h-[400px]' : 'max-h-[160px]'}`}>
+                  <div className="p-4 flex justify-between items-center cursor-pointer border-b border-slate-100" onClick={() => setExpandedId(expandedSection === 'bills' ? null : 'bills')}>
+                    <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <i className="ph ph-calendar-check text-emerald-500"></i> Contas da Semana
+                    </h4>
+                    <i className="ph ph-caret-down text-slate-400" style={{ transform: expandedSection === 'bills' ? 'rotate(180deg)' : 'rotate(0deg)' }}></i>
+                  </div>
+                  <div className="p-3 space-y-2">
+                    {bills.map((bill, i) => (
+                      <div key={i} className="flex justify-between items-center p-2 bg-white rounded-xl border border-slate-50">
+                        <div className="min-w-0">
+                          <p className="text-[10px] font-bold text-slate-700 truncate">{bill.desc}</p>
+                          <p className="text-[8px] text-slate-400 uppercase font-black">{bill.due} • {bill.status === 'urgent' ? 'HOJE' : 'A VENCER'}</p>
+                        </div>
+                        <span className={`text-[10px] font-mono font-black ${bill.status === 'urgent' ? 'text-red-500' : 'text-slate-600'}`}>
+                          R$ {bill.value.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Retornos e Garantias */}
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                    <i className="ph ph-arrow-counter-clockwise text-orange-500"></i> Retornos Técnicos
+                  </h4>
+                  <div className="grid grid-cols-1 gap-2">
+                    {alerts.map(alert => (
+                      <div key={alert.id} className="p-3 rounded-2xl border border-orange-100 bg-orange-50/20 flex flex-col gap-1">
+                        <div className="flex justify-between">
+                          <p className="text-[10px] font-black text-slate-800 uppercase truncate">{alert.title}</p>
+                          <span className="text-[8px] font-bold text-orange-500">{alert.date}</span>
+                        </div>
+                        <p className="text-[10px] text-slate-500 leading-tight italic">"{alert.desc}"</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                {/* Micro Indicador de Perdas */}
+                <div className="pt-4 border-t border-slate-50 flex items-center justify-between">
+                  <div>
+                    <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest block mb-1">Impacto Financeiro Perdas</span>
+                    <span className="text-sm font-bold text-red-500 font-mono">- R$ 1.240,00</span>
+                  </div>
+                  <button className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-black transition-all">Ver Detalhes</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+};
+
+export default Dashboard;

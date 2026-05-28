@@ -1,0 +1,86 @@
+===============================================================================
+SISTEMA SDG CONTROLE - RELATÓRIO DE DESENVOLVIMENTO (ATUALIZADO ABRIL/2026)
+===============================================================================
+
+1. ARQUITETURA CORE
+-------------------------------------------------------------------------------
+- Framework: Electron + React + TypeScript.
+- Banco de Dados: SQLite (Local) com motor de persistência em src/main/database.ts.
+- Estilização: Tailwind CSS com sistema de cores dinâmicas via Variáveis CSS.
+- Protocolos de Imagem: Protocolo customizado 'local-img://' para contornar restrições
+  do Windows e permitir exibição de arquivos da pasta AppData sem bloqueios de segurança.
+
+2. SISTEMA MULTI-LOJA DINÂMICO (NOVIDADE)
+-------------------------------------------------------------------------------
+- Transição completa do modelo estático (Loja A/B/C) para o modelo dinâmico.
+- Banco de Dados: Tabela 'stores' agora controla as unidades.
+- Lógica de Negócio: O sistema detecta automaticamente quantas lojas existem e:
+    * Cria campos de estoque para novas lojas ao cadastrar produtos.
+    * Gera colunas dinâmicas no Inventário.
+    * Renderiza badges de estoque no PDV (Pesquisa e Toast) baseados nos IDs do banco.
+    * Permite arquivar lojas sem perder o histórico de vendas.
+
+3. MÓDULO DE PRODUTOS E INVENTÁRIO
+-------------------------------------------------------------------------------
+- Gestão de Estoque: Controle individual por Loja (product_id + store_id).
+- Cadastro de Produtos: 
+    * Suporte a imagem (Upload local com processamento Base64 -> Buffer).
+    * Controle de Preço, Código de Barras (EAN) e Estoque Mínimo.
+    * Sistema de 'Arquivamento' para não deletar registros com histórico.
+- Importação Inteligente (Protocolo Guardião):
+    * Motor de parsing XML para entrada massiva de notas/estoque.
+    * Validação de integridade antes da inserção.
+    * Opção de selecionar a loja de destino no momento da importação.
+
+4. PONTO DE VENDA (PDV)
+-------------------------------------------------------------------------------
+- Scanner de Código de Barras: Input otimizado com detecção automática.
+- Carrinho de Compras: 
+    * Suporte a produtos físicos e Serviços (Ordens de Serviço).
+    * Cálculo em tempo real de descontos e totais.
+- Notificações: Sistema de Toast (Hot-Toast) que mostra o estoque de TODAS as lojas
+  assim que o produto é bipado (estratégia para vendas cruzadas entre unidades).
+- Fechamento de Venda: Abatimento automático no estoque da loja logada e geração
+  de registro na tabela 'sales' com os itens em formato JSON.
+
+5. GESTÃO FINANCEIRA E EQUIPE
+-------------------------------------------------------------------------------
+- Comissões: Cálculo automático (atualmente em 10%) gerado no ato da venda.
+- Hierarquia de Acesso:
+    * Admin: Acesso total (Preços, Estoques de todas as lojas, Configurações).
+    * Vendedor: Acesso restrito ao PDV e consulta de estoque.
+- Dashboard: Visão analítica de faturamento total e mensal (extraído via SQL).
+
+6. IMPRESSÃO TÉRMICA USB (ESC/POS) - NOVIDADE MAIO/2026
+-------------------------------------------------------------------------------
+- Integração de Baixo Nível: Utilização das bibliotecas 'escpos' e 'escpos-usb'.
+- Compatibilidade: Otimizado para impressoras Knup (KP-1029) e drivers WinUSB via Zadig.
+- Detecção Inteligente: Novo recurso de auto-detecção de impressoras USB via VID/PID 
+  diretamente na tela de configurações.
+- Formatação Avançada:
+    * Cabeçalhos em Negrito.
+    * Alinhamento centralizado/justificado.
+    * Corte automático de papel (Auto-cut).
+    * Tabelas de itens formatadas para 58mm.
+- Roteamento Automático: O hook 'usePrinter' detecta a configuração 'USB:VID:PID' e
+  direciona a impressão para o motor ESC/POS nativo, mantendo o fallback HTML.
+
+7. PERSONALIZAÇÃO E UX
+-------------------------------------------------------------------------------
+- Identidade Visual: O Admin pode alterar a cor principal do sistema e a logo
+  diretamente pelas configurações. As cores são propagadas para todos os botões,
+  hovers e notificações via variáveis de ambiente CSS.
+- Barra de Título: Customizada (Frame: false) para um visual moderno e limpo.
+
+8. ESTADO DA SINCRONIZAÇÃO (SUPABASE)
+-------------------------------------------------------------------------------
+- Motor de Sincronização: Localizado em src/main/SyncEngine.ts.
+- Status: Preparado para sincronizar Vendas e Produtos com a nuvem.
+- Imagens: Atualmente carregadas de forma híbrida (URL Supabase ou Local via protocolo).
+
+===============================================================================
+PRÓXIMOS PASSOS SUGERIDOS:
+1. Implementar o download automático de imagens da nuvem para o cache local (Offline-first).
+2. Adicionar relatórios de fechamento de caixa por período em PDF.
+3. Implementar controle de permissões mais granulado por usuário.
+===============================================================================

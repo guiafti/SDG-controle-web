@@ -1,0 +1,56 @@
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build and Release
+dist/
+release/
+*.exe
+*.dmg
+*.app
+*.zip
+
+# Drivers and Setup
+POS-58/
+"POS58 Printer/"
+drivers_kp-1029/
+setup-impressora.sh
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment and Secrets
+.env
+.env.local
+.env.*.local
+
+# Database
+local.db
+local.db-shm
+local.db-wal
+
+# Logs and Temp
+logs/
+*.log
+logs_conversa_anterior.txt
+test_print.txt
+
+# Project Specific (Temporary/Drafts)
+projeto - ideias mais prompt.txt
+REQUISITOS_ASSISTENCIA_TECNICA.txt
+carga_total_produtos.xml
+importacao_produtos.xml
+diagnostico_impressora.js
+audit_maintenance.js
+teste_real.js
+test_maintenance_system.js
+index.txt

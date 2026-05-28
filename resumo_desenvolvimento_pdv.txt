@@ -1,0 +1,96 @@
+========================================================================
+DOCUMENTAÇÃO TÉCNICA E VISÃO GERAL DO SISTEMA: PDV GRUPO IMPORT
+========================================================================
+
+1. VISÃO GERAL DO SISTEMA
+----------------------------------------------------------------
+O PDV Grupo Import é um sistema de Ponto de Venda (Frente de Caixa) e Retaguarda Administrativa construído sob a arquitetura "Offline-First" (Prioridade Offline). 
+Ele foi projetado especificamente para operar de forma rápida, fluida e ininterrupta, garantindo que as vendas nunca parem, mesmo em cenários de queda de internet ou instabilidade em servidores na nuvem.
+
+O sistema atende a um ambiente "Multiloja", permitindo que a mesma aplicação gerencie estoques e realize vendas separadas para diferentes unidades físicas (Ex: Loja Centro, Loja Avenida, Loja Shopping), mantendo um controle estrito e centralizado de comissões matemáticas e relatórios financeiros.
+
+2. ARQUITETURA E TECNOLOGIAS (TECH STACK)
+----------------------------------------------------------------
+- Aplicação Desktop: Electron.js (Garante acesso irrestrito ao hardware local e sistema de arquivos, rodando como um programa nativo executável leve e rápido).
+- Interface de Usuário (Frontend): React.js + TypeScript.
+- Estilização e UI/UX: TailwindCSS (Responsável pelo design moderno, limpo, responsivo e minimalista, inspirado em plataformas de alta performance).
+- Banco de Dados Local: SQLite (Motor de banco de dados SQL transacional embutido diretamente na máquina local, garantindo tempo de resposta de 0ms para buscas de produtos).
+- Segurança e Arquitetura (IPC): Protocolo de comunicação rígido que isola o banco de dados (Processo Principal Node.js) da interface visual (Processo de Renderização React), prevenindo falhas de segurança e injeções.
+
+3. MÓDULOS PRINCIPAIS DO SISTEMA
+----------------------------------------------------------------
+A) MÓDULO PDV (FRENTE DE CAIXA)
+- Operação "Calculadora": Tela de vendas ultrarrápida projetada para ser operada massivamente por leitores de código de barras ou atalhos de teclado (Ex: F10).
+- Inteligência de Carrinho: Agrupamento automático de itens repetidos, cálculo de subtotais em tempo real, aplicação de descontos numéricos e pesquisa manual sobreposta que não tira o operador da tela principal.
+- Lançamento de Serviços (OS): Módulo integrado que permite faturar serviços técnicos (como manutenção de celulares) direto no carrinho da venda de produtos, sem afetar o estoque físico da loja.
+- Finalização em Foco: Modal central e escurecido para seleção imediata de métodos de pagamento, evitando cliques acidentais e distrações.
+
+B) MÓDULO RETAGUARDA (ADMINISTRAÇÃO / GERÊNCIA)
+- Dashboard em Tempo Real: Visão gerencial de faturamento (mensal e acumulado) e status da fila de sincronização de vendas com a nuvem.
+- Gestão de Estoque (Protocolo Guardião): Sistema rígido de entrada de mercadorias. Em vez de edições manuais perigosas, a entrada de grandes lotes é feita via arquivos de lote (XML), blindando o banco contra falhas humanas. Possui uma listagem de dados hiper-compacta para checagem rápida de saldos entre as filiais.
+- Gestão de Equipe: Controle de usuários (operadores e administradores), permitindo gerenciar acessos locais, senhas e níveis de privilégio.
+- Acerto de Contas (Comissões): Relatório matemático exato e rastreável que calcula (via banco de dados) e exibe as comissões geradas a partir de cada venda, listadas por vendedor.
+- Motor de Personalização (White-label): Painel de identidade visual dinâmico que permite ao dono da rede alterar a logo da empresa e a cor principal. Um algoritmo interno calcula tons derivados e recolore automaticamente todo o sistema (botões, hover, alertas e marcas d'água).
+
+C) MOTOR DE SINCRONIZAÇÃO (SYNC ENGINE - Camada Híbrida)
+- Um serviço invisível rodando em segundo plano (background worker). Sua função é varrer as vendas marcadas como "não sincronizadas" no SQLite local e enviá-las para o banco de dados central na nuvem assim que uma conexão de internet estável for detectada, garantindo o espelhamento corporativo sem que a loja precise estar online para vender.
+
+========================================================================
+HISTÓRICO DE DESENVOLVIMENTO E IMPLEMENTAÇÕES REALIZADAS
+========================================================================
+
+1. ESTRUTURA DE BANCO DE DADOS E AUTENTICAÇÃO (Gestão de Equipe)
+- Criadas as tabelas 'stores' e 'users' no SQLite (database.ts).
+- Inseridos usuários padrão: Admin (senha: admin) e vendedores (senha: 1234).
+- Atualizado o 'LoginModal.tsx' para buscar lojas e operadores dinamicamente do banco via IPC.
+- Criada a página 'Users.tsx' no Retaguarda Administrativo para permitir cadastrar, editar e alterar o nível de acesso (Admin/Vendedor) da equipe.
+
+2. COMISSÕES MATEMÁTICAS (Acerto de Contas)
+- Criada a tabela 'commissions' no banco de dados.
+- Lógica de Venda ('save-sale'): Ao finalizar uma venda, o sistema agora calcula automaticamente uma comissão (padrão 10%) e salva na tabela de forma atrelada ao ID da venda.
+- Criada a página 'Commissions.tsx' que exibe um relatório real e detalhado das comissões geradas, informando vendedor, data, valor e status.
+
+3. PROTOCOLO GUARDIÃO (Importação XML)
+- Implementada a leitura de arquivos XML na aba de Estoque para entrada de produtos em lote.
+- Adicionados os botões "Baixar Modelo XML" e "Importar XML" em 'Inventory.tsx'.
+- O sistema processa o XML e direciona a carga de estoque massiva especificamente para a loja selecionada no momento da importação.
+
+4. DASHBOARD EM TEMPO REAL
+- Substituídos os valores fixos de faturamento na 'Dashboard.tsx' por dados financeiros reais puxados via script SQL (faturamento mensal isolado e total acumulado histórico).
+- O indicador de "Sincronização" foi atrelado ao backend via IPC.
+
+5. FLUIDEZ NO CAIXA E NOTIFICAÇÕES TOAST
+- Instalada a biblioteca 'react-hot-toast' para substituir os antigos e travados alert() e confirm() nativos do navegador.
+- O sistema agora exibe notificações pop-up modernas, animadas e não-bloqueantes no canto superior direito para sucessos, erros e eventos de carregamento.
+
+6. MELHORIAS NA LÓGICA DO CARRINHO (CartList)
+- Agrupamento Inteligente: Bipar o mesmo código de barras múltiplas vezes agora localiza o item no carrinho, soma +1 na quantidade e recalcula o subtotal, em vez de criar linhas sujas e repetidas.
+- Edição Manual: Adicionados controles de [+] e [-] direto na linha do produto no carrinho para ajustar quantidades on-the-fly.
+- Marca d'Água Corporativa: O fundo da área de itens do caixa agora exibe o logo da empresa processado (escala de cinza e 3% de opacidade).
+
+7. FINALIZAÇÃO DE VENDA E ATALHOS DE TECLADO (F10)
+- Removida a seleção de pagamento "apertada" no canto da tela de vendas.
+- Implementado um EventListener para a tecla 'F10' que bloqueia a interface de trás e abre um Modal Central escurecido.
+- O operador agora finaliza a venda sem usar o mouse, apenas pressionando os números correspondentes do teclado (1-PIX, 2-Crédito, 3-Débito, 4-Dinheiro).
+- Implementada a tecla 'ESC' como rota de escape/cancelamento.
+
+8. PESQUISA MANUAL DE PRODUTOS
+- O botão "Lupa" no PDV foi conectado ao novo componente 'ProductSearchModal.tsx'.
+- Criada uma barra de pesquisa over-the-top que escuta e filtra instantaneamente os produtos em memória pelo nome ou código de barras.
+- Botões de "Adicionar" diretos na lista de resultados injetam o produto na tela de trás e fecham o modal.
+
+9. IDENTIDADE VISUAL CUSTOMIZÁVEL (Motor White-label)
+- Janela Frameless: Ocultada nativamente a barra superior feia do Windows/Electron através das flags 'frame: false' e 'titleBarStyle: hidden'.
+- TitleBar.tsx: Desenvolvida uma barra de topo escura customizada que escuta as APIs do Sistema Operacional para permitir arrastar a janela (drag region) e controlar botões de Minimizar, Maximizar e Fechar.
+- Painel Settings: Criada a aba de "Personalização" para o administrador enviar a imagem da Logo e selecionar uma Cor Hexadecimal base.
+- Dinamismo CSS: A cor escolhida é injetada em variáveis :root no CSS da aplicação, e uma função JS matemática escurece e clareia essa cor para gerar todos os estados de hover, active e focus do sistema de ponta a ponta.
+
+10. REDESIGN E COMPACTAÇÃO DA TELA DE ESTOQUE
+- A antiga tabela horizontalizada de produtos foi destruída.
+- Reconstruída do zero utilizando divs modernas simulando um "Data Grid" super compacto e achatado para caber o dobro de itens na mesma visualização de tela.
+- Os saldos das filiais (Loja A, Loja B e Loja C) agora são renderizados lado a lado verticalmente com indicadores que ficam vermelhos criticamente caso o estoque zere.
+- Acoplada uma barra de busca rápida fixa no topo da lista.
+
+11. CORREÇÕES DE BANCO (MIGRAÇÕES A QUENTE)
+- Identificado crash de banco ao finalizar vendas devido à tabela antiga não suportar a coluna de "descontos".
+- Criado um script inteligente de migração automática (Try/Catch ALTER TABLE) no 'database.ts' para injetar colunas novas no SQLite sem corromper as vendas antigas do usuário local.

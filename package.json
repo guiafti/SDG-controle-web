@@ -1,0 +1,85 @@
+{
+  "name": "pdv-grupo-import",
+  "version": "1.1.1",
+  "main": "dist/main/main.js",
+  "description": "Sistema de PDV Desktop Offline-first",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Marcelaun/SDG_Controle_Gui.git"
+  },
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build:ui": "vite build",
+    "build:main": "npx esbuild src/main/main.ts --bundle --platform=node --external:electron --external:better-sqlite3 --external:node-thermal-printer --external:usb --outfile=dist/main/main.js && npx esbuild src/main/preload.ts --bundle --platform=node --external:electron --outfile=dist/main/preload.js",
+    "electron:dev": "npm run build:main && npx concurrently -n vite,electron -c green,blue \"npm run dev\" \"wait-on tcp:127.0.0.1:5173 && npx electron .\"",
+    "dist": "npm run build:ui && npm run build:main && electron-builder",
+    "rebuild": "electron-rebuild -f",
+    "reset-db": "node reset-db.js"
+  },
+  "build": {
+    "appId": "com.sdg.controle",
+    "productName": "SDG Controle",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "Marcelaun",
+        "repo": "sdg-releases"
+      }
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "extraResources": [
+      ".env"
+    ],
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/better-sqlite3/**/*"
+    ],
+    "win": {
+      "target": "nsis",
+      "icon": "logo.jpg"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "shortcutName": "SDG Controle"
+    }
+  },
+  "dependencies": {
+    "@phosphor-icons/web": "^2.0.2",
+    "@supabase/ssr": "^0.10.2",
+    "@supabase/supabase-js": "^2.105.1",
+    "better-sqlite3": "^12.9.0",
+    "clsx": "^2.0.0",
+    "dotenv": "^17.4.2",
+    "electron-updater": "^6.8.3",
+    "escpos": "^3.0.0-alpha.6",
+    "escpos-usb": "^3.0.0-alpha.1",
+    "fast-xml-parser": "^4.2.7",
+    "node-thermal-printer": "^4.4.1",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-hot-toast": "^2.6.0",
+    "tailwind-merge": "^1.14.0",
+    "usb": "^2.13.0"
+  },
+  "devDependencies": {
+    "@electron/rebuild": "^3.3.0",
+    "@vitejs/plugin-react": "^4.0.3",
+    "autoprefixer": "^10.4.15",
+    "concurrently": "^8.2.1",
+    "electron": "^26.2.1",
+    "electron-builder": "^24.6.4",
+    "esbuild": "^0.19.2",
+    "postcss": "^8.4.28",
+    "tailwindcss": "^3.3.3",
+    "typescript": "^5.0.2",
+    "vite": "^4.4.5",
+    "wait-on": "^7.0.1"
+  }
+}
