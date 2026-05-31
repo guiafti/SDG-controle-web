@@ -6,7 +6,19 @@ import { printerService } from '../services/printerService';
 // ... (interface remains same)
 
 const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName, onStatusChange }) => {
-  // ... (states remains same)
+  const [currentRegister, setCurrentRegister] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [view, setView] = useState<'status' | 'opening' | 'closing'>('status');
+  
+  // Opening state
+  const [openingBalance, setOpeningBalance] = useState('0');
+  
+  // Closing state
+  const [totals, setTotals] = useState<any>(null);
+  const [topProducts, setTopProducts] = useState<any[]>([]);
+  const [salesByEmployee, setSalesByEmployee] = useState<any[]>([]);
+  const [reportedBalance, setReportedBalance] = useState('');
+  const [notes, setNotes] = useState('');
 
   const fetchRegister = async () => {
     setLoading(true);
@@ -49,7 +61,37 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
     }
   };
 
-  // ... (generatePrintableReceipt remains same)
+  const generatePrintableReceipt = (totals: any, topProducts: any[], salesByEmployee: any[]) => {
+    let receipt = "=== FECHAMENTO DE CAIXA ===\n\n";
+    receipt += `Abertura: ${new Date(currentRegister?.opened_at).toLocaleString()}\n`;
+    receipt += `Fechamento: ${new Date().toLocaleString()}\n`;
+    receipt += `Operador: ${userName}\n`;
+    receipt += `\n--- RESUMO FINANCEIRO ---\n`;
+    receipt += `Fundo de Caixa: R$ ${currentRegister?.opening_balance?.toFixed(2) || '0.00'}\n`;
+    receipt += `Vendas Dinheiro: R$ ${totals.cash.toFixed(2)}\n`;
+    receipt += `Vendas Pix: R$ ${totals.pix.toFixed(2)}\n`;
+    receipt += `Vendas Cartao: R$ ${totals.card.toFixed(2)}\n`;
+    receipt += `Descontos Dados: R$ ${totals.discounts.toFixed(2)}\n`;
+    receipt += `Total de Vendas: R$ ${totals.sales.toFixed(2)}\n`;
+    receipt += `Saidas/Despesas: R$ ${totals.expenses.toFixed(2)}\n`;
+    receipt += `\nVALOR ESPERADO (GAVETA): R$ ${(currentRegister?.opening_balance + totals.cash - totals.expenses).toFixed(2)}\n`;
+    receipt += `VALOR INFORMADO: R$ ${parseFloat(reportedBalance || '0').toFixed(2)}\n`;
+    
+    receipt += `\n--- PERFORMANCE DA EQUIPE ---\n`;
+    salesByEmployee.forEach(emp => {
+      receipt += `${emp.name}: R$ ${emp.total.toFixed(2)}\n`;
+    });
+
+    receipt += `\n--- TOP 5 PRODUTOS ---\n`;
+    topProducts.forEach(prod => {
+      receipt += `${prod.qtd}x - ${prod.nome}\n`;
+    });
+
+    receipt += `\n---------------------------\n`;
+    receipt += `Assinatura Gerente/Operador\n`;
+    receipt += `\n\n\n`;
+    return receipt;
+  };
 
   const handleStartClosing = async () => {
     const data = await registerService.getData({ storeId, openedAt: currentRegister.opened_at });

@@ -1,7 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { customerService } from '../services/customerService';
 
-// ... (interface remains same)
+interface FinancialPanelProps {
+  totalItems: number;
+  discount: number;
+  onDiscountChange: (value: number) => void;
+  onFinish: (paymentMethod: string, customerId?: string) => void;
+}
 
 const FinancialPanel: React.FC<FinancialPanelProps> = ({ 
   totalItems, 
@@ -9,7 +14,11 @@ const FinancialPanel: React.FC<FinancialPanelProps> = ({
   onDiscountChange, 
   onFinish 
 }) => {
-  // ... (states remains same)
+  const [customers, setCustomers] = useState<any[]>([]);
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [customerSearch, setCustomerSearch] = useState('');
+  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
 
   const totalFinal = Math.max(0, totalItems - discount);
 

@@ -3,11 +3,17 @@ import { productService } from '../services/productService';
 import { storeService } from '../services/storeService';
 
 interface ProductSearchModalProps {
-  // ... (interface remains same)
+  isOpen: boolean;
+  onClose: () => void;
+  onSelectProduct: (barcode: string) => void;
+  storeId?: string;
 }
 
 const ProductSearchModal: React.FC<ProductSearchModalProps> = ({ isOpen, onClose, onSelectProduct, storeId }) => {
-  // ... (states remains same)
+  const [products, setProducts] = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [viewingProduct, setViewingProduct] = useState<any>(null);
 
   useEffect(() => {
     if (isOpen) {

@@ -3,7 +3,16 @@ import { toast } from 'react-hot-toast';
 import { userService } from '../services/userService';
 
 const Users: React.FC = () => {
-  // ... (states remains same)
+  const [users, setUsers] = useState<any[]>([]);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<any>(null);
+
+  const [formName, setFormName] = useState('');
+  const [formPassword, setFormPassword] = useState('');
+  const [formRole, setFormRole] = useState('vendedor');
+  const [formPhoto, setFormPhoto] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchUsers = async () => {
     try {
@@ -14,7 +23,14 @@ const Users: React.FC = () => {
 
   useEffect(() => { fetchUsers(); }, []);
 
-  // ... (openModal remains same)
+  const openModal = (u: any = null) => {
+    setEditingUser(u);
+    setFormName(u?.name || '');
+    setFormPassword(u?.password || '');
+    setFormRole(u?.role || 'vendedor');
+    setFormPhoto(u?.photo_url || null);
+    setIsModalOpen(true);
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

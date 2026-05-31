@@ -6,10 +6,53 @@ import { repairService } from '../services/repairService';
 import { storeService } from '../services/storeService';
 import { settingService } from '../services/miscService';
 
-// ... (interface and constants remains same)
+interface RepairOrderModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+const CHECKLIST_OPTIONS = [
+  'Carregador',
+  'Cabo USB',
+  'Capa de Proteção',
+  'Cartão SIM',
+  'Cartão de Memória',
+  'Caixa Original',
+  'Nota Fiscal'
+];
+
+const PRIORITY_OPTIONS = [
+  { value: 'low', label: 'Baixa', color: 'bg-slate-100 text-slate-600' },
+  { value: 'normal', label: 'Normal', color: 'bg-blue-100 text-blue-600' },
+  { value: 'high', label: 'Alta', color: 'bg-orange-100 text-orange-600' },
+  { value: 'urgent', label: 'Urgente', color: 'bg-red-100 text-red-600' }
+];
 
 const RepairOrderModal: React.FC<RepairOrderModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  // ... (states remains same)
+  const [stores, setStores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [photo, setPhoto] = useState<string | null>(null);
+
+  // Form states
+  const [customerName, setCustomerName] = useState('');
+  const [customerPhone, setCustomerPhone] = useState('');
+  const [customerPhoneSecondary, setCustomerPhoneSecondary] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
+  const [brand, setBrand] = useState('');
+  const [model, setModel] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [devicePassword, setDevicePassword] = useState('');
+  const [visualCondition, setVisualCondition] = useState('');
+  const [issue, setIssue] = useState('');
+  const [technicalNotes, setTechnicalNotes] = useState('');
+  const [priority, setPriority] = useState('normal');
+  const [price, setPrice] = useState('');
+  const [destStoreId, setDestStoreId] = useState('');
+  const [returnStoreId, setReturnStoreId] = useState('');
+  const [deliveryDate, setDeliveryDate] = useState('');
+  const [checklist, setChecklist] = useState<string[]>([]);
+  const { printRepair } = usePrinter();
 
   useEffect(() => {
     if (isOpen) {
@@ -30,7 +73,49 @@ const RepairOrderModal: React.FC<RepairOrderModalProps> = ({ isOpen, onClose, on
     } catch (e) { console.error(e); }
   };
 
-  // ... (resetForm, handlePhotoChange remains same)
+  const maskPhone = (val: string) => {
+    const cleaned = val.replace(/\D/g, '').substring(0, 11);
+    if (cleaned.length <= 10) {
+      return cleaned.replace(/(\d{2})(\d{4})(\d{4})/, '($1) $2-$3');
+    }
+    return cleaned.replace(/(\d{2})(\d{5})(\d{4})/, '($1) $2-$3');
+  };
+
+  const resetForm = () => {
+    setCustomerName('');
+    setCustomerPhone('');
+    setCustomerPhoneSecondary('');
+    setCustomerEmail('');
+    setBrand('');
+    setModel('');
+    setSerialNumber('');
+    setDevicePassword('');
+    setVisualCondition('');
+    setIssue('');
+    setTechnicalNotes('');
+    setPriority('normal');
+    setPrice('');
+    setPhoto(null);
+    setDeliveryDate('');
+    setChecklist([]);
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhoto(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const toggleChecklist = (item: string) => {
+    setChecklist(prev => 
+      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
+    );
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

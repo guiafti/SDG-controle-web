@@ -4,11 +4,14 @@ import TaskCompletionModal from '../components/TaskCompletionModal';
 import { taskService } from '../services/miscService';
 
 interface ProcessesProps {
-  // ... (interface remains same)
+  currentUser?: { id: string, name: string, role: string };
+  currentStoreId?: string;
 }
 
 const Processes: React.FC<ProcessesProps> = ({ currentUser, currentStoreId }) => {
-  // ... (states remains same)
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedTaskForCompletion, setSelectedTaskForCompletion] = useState<any>(null);
 
   const fetchTasks = async () => {
     setLoading(true);

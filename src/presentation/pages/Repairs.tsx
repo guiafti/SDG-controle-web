@@ -7,7 +7,35 @@ import { repairService } from '../services/repairService';
 import { storeService } from '../services/storeService';
 import { settingService } from '../services/miscService';
 
-// ... (fetchData and handleUpdateStatus remains same)
+const WORKFLOW_STEPS = [
+  'Na Loja (Aguardando Envio)',
+  'Enviado para Laboratório',
+  'Recebido no Laboratório',
+  'Em Manutenção',
+  'Manutenção Concluída',
+  'Disponível para Retirada',
+  'Entregue'
+];
+
+const Repairs: React.FC = () => {
+  const [repairs, setRepairs] = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [filter, setFilter] = useState<'all' | 'local'>('local');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isEditingNotes, setIsEditingNotes] = useState(false);
+  const [localNotes, setLocalNotes] = useState('');
+
+  const { printRepair } = usePrinter();
+
+  const currentStoreId = localStorage.getItem('selectedStoreId') || '1';
+
+  useEffect(() => {
+    fetchData();
+  }, []);
 
   const fetchData = async () => {
     setLoading(true);

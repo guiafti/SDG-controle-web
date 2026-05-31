@@ -6,11 +6,41 @@ import { userService } from '../services/userService';
 import { taskService } from '../services/miscService';
 
 interface NetworkManagementProps {
-  // ... (interface remains same)
+  currentUser?: { id: string, name: string, role: string };
+  currentStoreId?: string;
 }
 
 const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, currentStoreId }) => {
-  // ... (states remains same)
+  const [stores, setStores] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [tasks, setTasks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'missions' | 'stores' | 'users'>('missions');
+
+  // Modals
+  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
+  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
+  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
+  const [selectedTaskForCompletion, setSelectedTaskForCompletion] = useState<any>(null);
+
+  // Edit States
+  const [editingStore, setEditingStore] = useState<any>(null);
+  const [editingUser, setEditingUser] = useState<any>(null);
+  const [editingTask, setEditingTask] = useState<any>(null);
+
+  // Form states
+  const [storeName, setStoreName] = useState('');
+  const [userName, setUserName] = useState('');
+  const [userPassword, setUserPassword] = useState('');
+  const [userRole, setUserRole] = useState('vendedor');
+  const [userPhoto, setUserPhoto] = useState('');
+
+  const [taskTitle, setTaskTitle] = useState('');
+  const [taskAssigneeType, setTaskAssigneeType] = useState<'store' | 'user'>('store');
+  const [taskAssigneeId, setTaskAssigneeId] = useState('');
+  const [taskDueDate, setTaskDueDate] = useState('');
+  const [taskIsRoutine, setTaskIsRoutine] = useState(false);
+  const [taskProofRequired, setTaskProofRequired] = useState(false);
 
   const fetchData = async () => {
     setLoading(true);

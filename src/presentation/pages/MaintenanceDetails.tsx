@@ -3,7 +3,34 @@ import { toast } from 'react-hot-toast';
 import { repairService } from '../services/repairService';
 import { printerService } from '../services/printerService';
 
-// ... (fetchHistory, requestStatusChange, requestBudgetSave remains same)
+interface MaintenanceDetailsProps {
+  order: any;
+  stores: any[];
+  onClose: () => void;
+  onUpdate: () => void;
+}
+
+const WORKFLOW_STEPS = [
+  'Recebido na Loja',
+  'Enviado para Laboratório',
+  'Recebido no Laboratório',
+  'Em Orçamento/Análise',
+  'Aguardando Aprovação',
+  'Em Manutenção',
+  'Manutenção Concluída',
+  'Em Trânsito de Retorno',
+  'Pronto para Entrega',
+  'Entregue ao Cliente'
+];
+
+const MaintenanceDetails: React.FC<MaintenanceDetailsProps> = ({ order, stores, onClose, onUpdate }) => {
+  const [history, setHistory] = useState<any[]>([]);
+  const [budgetPrice, setBudgetPrice] = useState(order.price || '');
+  const [techNotes, setTechNotes] = useState(order.technical_notes || '');
+
+  useEffect(() => {
+    fetchHistory();
+  }, [order.id]);
 
   const fetchHistory = async () => {
     try {

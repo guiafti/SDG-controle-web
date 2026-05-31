@@ -5,10 +5,21 @@ import { printerService } from '../services/printerService';
 import { financialService } from '../services/financialService';
 import { systemService } from '../services/systemService';
 
-// ... (adjustColor remains same)
+const adjustColor = (color: string, amount: number) => {
+  return '#' + color.replace(/^#/, '').replace(/../g, color => ('0'+Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2));
+};
 
 const Settings: React.FC = () => {
-  // ... (states remains same)
+  const [activeTab, setActiveTab] = useState<'visual' | 'financeiro' | 'impressao' | 'chatbot'>('visual');
+  const [primaryColor, setPrimaryColor] = useState('#3b82f6'); 
+  const [logoBase64, setLogoBase64] = useState('');
+  const [appZoom, setAppZoom] = useState(1.0);
+  const [printerInterface, setPrinterInterface] = useState('printer:POS-58');
+  const [printerType, setPrinterType] = useState('escpos');
+  const [availablePrinters, setAvailablePrinters] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [newCategory, setNewCategory] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchSettings();

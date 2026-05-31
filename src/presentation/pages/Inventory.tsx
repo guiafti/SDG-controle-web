@@ -8,9 +8,47 @@ interface InventoryProps {
 }
 
 const Inventory: React.FC<InventoryProps> = ({ role }) => {
-  // ... state declarations
+  const [products, setProducts] = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showArchived, setShowArchived] = useState(false);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingProduct, setEditingProduct] = useState<any>(null);
 
-  // ... (icons and standardIcons remains same)
+  const [formName, setFormName] = useState('');
+  const [formBarcode, setFormBarcode] = useState('');
+  const [formExtraBarcodes, setFormExtraBarcodes] = useState<string[]>([]);
+  const [formNewExtraBarcode, setFormNewExtraBarcode] = useState('');
+  const [formPrice, setFormPrice] = useState('');
+  const [formImage, setFormImage] = useState('');
+  const [selectedIcon, setSelectedIcon] = useState('');
+  const [libraryItems, setLibraryItems] = useState<any[]>([]);
+  const [isLibraryUploadOpen, setIsLibraryUploadOpen] = useState(false);
+  const [formStocks, setFormStocks] = useState<Record<string, number>>({});
+  const [formStockAdditions, setFormStockAdditions] = useState<Record<string, number>>({});
+  const [formMinStocks, setFormMinStocks] = useState<Record<string, number>>({});
+  const [formSaleTolerances, setFormSaleTolerances] = useState<Record<string, number>>({});
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const standardIcons = [
+    { id: 'ph-device-mobile', label: 'Celular', color: 'bg-blue-500' },
+    { id: 'ph-plug-connected', label: 'Cabo/Carregador', color: 'bg-emerald-500' },
+    { id: 'ph-headphones', label: 'Fone', color: 'bg-purple-500' },
+    { id: 'ph-watch', label: 'Smartwatch', color: 'bg-orange-500' },
+    { id: 'ph-battery-charging', label: 'Bateria', color: 'bg-red-500' },
+    { id: 'ph-speaker-hifi', label: 'Caixa de Som', color: 'bg-pink-500' },
+    { id: 'ph-mouse', label: 'Mouse', color: 'bg-indigo-500' },
+    { id: 'ph-keyboard', label: 'Teclado', color: 'bg-slate-700' },
+    { id: 'ph-monitor', label: 'Monitor', color: 'bg-cyan-600' },
+    { id: 'ph-camera', label: 'Câmera', color: 'bg-yellow-600' },
+    { id: 'ph-hard-drive', label: 'HD/SSD', color: 'bg-zinc-600' },
+    { id: 'ph-cpu', label: 'Processador', color: 'bg-teal-600' },
+    { id: 'ph-game-controller', label: 'Games', color: 'bg-rose-600' },
+    { id: 'ph-usb', label: 'Pendrive', color: 'bg-sky-600' },
+    { id: 'ph-shield-check', label: 'Película', color: 'bg-green-600' },
+    { id: 'ph-wrench', label: 'Peças/Serviço', color: 'bg-gray-600' }
+  ];
 
   const fetchData = async () => {
     try {

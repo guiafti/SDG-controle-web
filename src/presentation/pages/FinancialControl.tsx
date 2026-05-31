@@ -7,7 +7,37 @@ import { userService } from '../services/userService';
 import { printerService } from '../services/printerService';
 
 const FinancialControl: React.FC = () => {
-  // ... state declarations (same as before)
+  const [expenses, setExpenses] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [summary, setSummary] = useState<any>({ totalInflow: 0, totalOutflow: 0, netProfit: 0, estimatedCost: 0, trends: [] });
+  const [budgets, setBudgets] = useState<any[]>([]);
+  const [stores, setStores] = useState<any[]>([]);
+  const [registers, setRegisters] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'registers' | 'reports' | 'planning'>('dashboard');
+  
+  // States for Reports
+  const [reportFilters, setReportFilters] = useState({
+    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    endDate: new Date().toISOString().split('T')[0],
+    storeId: 'all',
+    seller: 'all'
+  });
+  const [reportData, setReportData] = useState<any>(null);
+  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
+  const [sellers, setSellers] = useState<any[]>([]);
+
+  // Form states
+  const [description, setDescription] = useState('');
+  const [value, setValue] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
+  const [storeId, setStoreId] = useState('');
+
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [selectedRegister, setSelectedRegister] = useState<any>(null);
 
   useEffect(() => {
     fetchData();
