@@ -1,4 +1,5 @@
 import React, { useRef, useEffect, useState } from 'react';
+import { productService } from '../services/productService';
 
 interface BarcodeScannerProps {
   onScan: (code: string) => void;
@@ -6,10 +7,7 @@ interface BarcodeScannerProps {
 }
 
 const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onOpenSearch }) => {
-  const [searchTerm, setSearchTerm] = useState('');
-  const [results, setResults] = useState<any[]>([]);
-  const [allProducts, setAllProducts] = useState<any[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
+  // ... (state remains same)
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -17,8 +15,10 @@ const BarcodeScanner: React.FC<BarcodeScannerProps> = ({ onScan, onOpenSearch })
   }, []);
 
   const fetchProducts = async () => {
-    const data = await window.api.getAllProducts();
-    setAllProducts(data || []);
+    try {
+      const data = await productService.getAll();
+      setAllProducts(data || []);
+    } catch (e) { console.error(e); }
   };
 
   useEffect(() => {

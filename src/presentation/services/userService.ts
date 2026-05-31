@@ -29,5 +29,29 @@ export const userService = {
         return data;
       }
     );
+  },
+
+  async save(user: any) {
+    return apiCall(
+      () => window.api.saveUser(user),
+      async () => {
+        if (!supabase) throw new Error('Supabase não configurado');
+        const payload = {
+          ...user,
+          id: user.id || crypto.randomUUID(),
+          updated_at: new Date().toISOString()
+        };
+        const { error } = await supabase.from('users').upsert(payload);
+        if (error) return { success: false, error: error.message };
+        return { success: true };
+      }
+    );
+  },
+
+  async uploadPhoto(params: { userId: string; base64Data: string }) {
+    return apiCall(
+      () => window.api.uploadUserPhoto(params),
+      async () => ({ success: false, error: 'Upload não disponível na versão Web' })
+    );
   }
 };

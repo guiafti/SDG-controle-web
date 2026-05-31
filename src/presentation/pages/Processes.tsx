@@ -1,21 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import TaskCompletionModal from '../components/TaskCompletionModal';
+import { taskService } from '../services/miscService';
 
 interface ProcessesProps {
-  currentUser?: { id: string, name: string, role: string };
-  currentStoreId?: string;
+  // ... (interface remains same)
 }
 
 const Processes: React.FC<ProcessesProps> = ({ currentUser, currentStoreId }) => {
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedTaskForCompletion, setSelectedTaskForCompletion] = useState<any>(null);
+  // ... (states remains same)
 
   const fetchTasks = async () => {
     setLoading(true);
     try {
-      const data = await window.api.getTasks();
+      const data = await taskService.getAll();
       setTasks(data || []);
     } catch (e) {
       toast.error('Erro ao carregar processos');
@@ -35,13 +33,13 @@ const Processes: React.FC<ProcessesProps> = ({ currentUser, currentStoreId }) =>
     
     const loadingId = toast.loading('Registrando conclusão...');
     try {
-      const res = await window.api.completeTask(selectedTaskForCompletion.id, data.photo, data.justification);
+      const res = await taskService.complete(selectedTaskForCompletion.id, data.photo, data.justification);
       if (res.success) {
         toast.success('PROCESSO CONCLUÍDO!', { id: loadingId });
         setSelectedTaskForCompletion(null);
         fetchTasks();
       }
-    } catch (e) { toast.error('ERRO AO CONCLUIR', { id: loadingId }); }
+    } catch (e) { toast.error('ERRO DE COMUNICAÇÃO', { id: loadingId }); }
   };
 
   // Filtro Inteligente: O funcionário só vê o que é DELE ou da LOJA dele

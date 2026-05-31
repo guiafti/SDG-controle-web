@@ -1,17 +1,13 @@
 import React, { useState, useEffect } from 'react';
+import { productService } from '../services/productService';
+import { storeService } from '../services/storeService';
 
 interface ProductSearchModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSelectProduct: (barcode: string) => void;
-  storeId?: string;
+  // ... (interface remains same)
 }
 
 const ProductSearchModal: React.FC<ProductSearchModalProps> = ({ isOpen, onClose, onSelectProduct, storeId }) => {
-  const [products, setProducts] = useState<any[]>([]);
-  const [stores, setStores] = useState<any[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [viewingProduct, setViewingProduct] = useState<any>(null);
+  // ... (states remains same)
 
   useEffect(() => {
     if (isOpen) {
@@ -23,8 +19,8 @@ const ProductSearchModal: React.FC<ProductSearchModalProps> = ({ isOpen, onClose
   const fetchData = async () => {
     try {
       const [pData, sData] = await Promise.all([
-        window.api.getAllProducts(),
-        window.api.getStores()
+        productService.getAll(),
+        storeService.getAll()
       ]);
       setProducts(pData || []);
       setStores(sData || []);

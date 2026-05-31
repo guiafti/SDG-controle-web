@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import clsx from 'clsx';
 import { isElectron } from '../services/api';
+import { systemService } from '../services/systemService';
 
 interface TitleBarProps {
   logo?: string;
@@ -17,14 +18,14 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
 
   useEffect(() => {
     if (!isElectron) {
-      setIsOnline(true); // Na web estamos sempre "online" em relação ao Supabase
+      setIsOnline(true);
       return;
     }
 
     const updateStatus = async () => {
       try {
-        const appTitle = await window.api.getAppTitle();
-        const configured = await window.api.isCloudConfigured();
+        const appTitle = await systemService.getAppTitle();
+        const configured = await systemService.isCloudConfigured();
         setTitle(appTitle);
         setIsOnline(configured);
       } catch (e) {}
@@ -33,28 +34,22 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
     updateStatus();
     const interval = setInterval(updateStatus, 5000);
 
-    // Listeners de Atualização (Só Electron)
-    let unAvailable = () => {};
-    let unProgress = () => {};
-    let unDownloaded = () => {};
+    // Listeners de Atualização (Só Electron via Service)
+    const unAvailable = systemService.onUpdateAvailable((info) => {
+      setUpdateStatus({ type: 'available', version: info.version });
+    });
 
-    try {
-      unAvailable = window.api.onUpdateAvailable((info) => {
-        setUpdateStatus({ type: 'available', version: info.version });
-      });
+    const unProgress = systemService.onUpdateProgress((progress) => {
+      setUpdateStatus(prev => ({ 
+        ...prev, 
+        type: 'downloading', 
+        progress: progress.percent 
+      }));
+    });
 
-      unProgress = window.api.onUpdateProgress((progress) => {
-        setUpdateStatus(prev => ({ 
-          ...prev, 
-          type: 'downloading', 
-          progress: progress.percent 
-        }));
-      });
-
-      unDownloaded = window.api.onUpdateDownloaded((info) => {
-        setUpdateStatus({ type: 'ready', version: info.version });
-      });
-    } catch (e) {}
+    const unDownloaded = systemService.onUpdateDownloaded((info) => {
+      setUpdateStatus({ type: 'ready', version: info.version });
+    });
 
     return () => {
       clearInterval(interval);
@@ -68,7 +63,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
     <div 
       className={clsx(
         "h-10 w-full bg-slate-900 flex items-center justify-between px-4 select-none shrink-0 border-b border-slate-800 z-[999] relative",
-        !isElectron && "hidden" // Oculta barra de título na web se desejar, ou mantém sem botões
+        !isElectron && "hidden"
       )} 
       style={isElectron ? { WebkitAppRegion: 'drag' } as any : {}}
     >
@@ -121,21 +116,21 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
       {isElectron && (
         <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as any}>
           <button 
-            onClick={() => window.api.minimizeWindow()} 
+            onClick={() => systemService.minimize()} 
             className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
             title="Minimizar"
           >
             <i className="ph ph-minus"></i>
           </button>
           <button 
-            onClick={() => window.api.maximizeWindow()} 
+            onClick={() => systemService.maximize()} 
             className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
             title="Maximizar / Restaurar"
           >
             <i className="ph ph-square"></i>
           </button>
           <button 
-            onClick={() => window.api.closeWindow()} 
+            onClick={() => systemService.close()} 
             className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-red-500 rounded transition-colors"
             title="Fechar Sistema"
           >

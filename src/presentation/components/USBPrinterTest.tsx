@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { toast } from 'react-hot-toast';
+import { printerService } from '../services/printerService';
 
 const USBPrinterTest: React.FC = () => {
   const [devices, setDevices] = useState<any[]>([]);
@@ -7,7 +8,7 @@ const USBPrinterTest: React.FC = () => {
   const listDevices = async () => {
     const loadingId = toast.loading('Buscando dispositivos USB...');
     try {
-      const res = await window.api.listUsbDevices();
+      const res = await printerService.listUsbDevices();
       setDevices(res || []);
       toast.success(`${res.length} dispositivos encontrados`, { id: loadingId });
     } catch (e: any) {
@@ -22,10 +23,7 @@ const USBPrinterTest: React.FC = () => {
       const vid = 0x28E9;
       const pid = 0x0289;
       
-      // O PrinterModule.printUSB no Main foi configurado para aceitar texto simples.
-      // Você pode enviar comandos ESC/POS básicos como strings se desejar, 
-      // mas a biblioteca escpos já cuida do Negrito e Corte por padrão no nosso método.
-      const res = await window.api.printUSB(vid, pid, 'SDG CONTROLE\n----------------\nTESTE DE FORMATACAO\n\n(O Negrito e Corte sao automaticos)');
+      const res = await printerService.printUSB(vid, pid, 'SDG CONTROLE\n----------------\nTESTE DE FORMATACAO\n\n(O Negrito e Corte sao automaticos)');
       
       if (res.success) {
         toast.success('Impresso com sucesso!', { id: loadingId });

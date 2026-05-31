@@ -1,10 +1,12 @@
 import { useCallback } from 'react';
 import toast from 'react-hot-toast';
+import { printerService } from '../services/printerService';
+import { settingService } from '../services/miscService';
 
 export const usePrinter = () => {
   const getPrinterSettings = async () => {
     try {
-      const settings = await window.api.getSettings();
+      const settings = await settingService.getAll();
       return {
         interface: settings.find((s: any) => s.key === 'printer_interface')?.value || 'printer:POS-58',
         type: settings.find((s: any) => s.key === 'printer_type')?.value || 'escpos'
@@ -38,7 +40,7 @@ export const usePrinter = () => {
           date: new Date(sale.created_at || new Date()).toLocaleString('pt-BR')
         };
 
-        const res = await window.api.printUSB(vid, pid, rawData);
+        const res = await printerService.printUSB(vid, pid, rawData);
         if (res.success) {
           toast.success("Cupom de Venda impresso!");
           return;
@@ -46,7 +48,7 @@ export const usePrinter = () => {
       }
 
       // Fallback para HTML (Driver do Sistema)
-      await window.api.printReceipt({ 
+      await printerService.printReceipt({ 
         sale, 
         storeName, 
         logo, 
@@ -86,7 +88,7 @@ export const usePrinter = () => {
           delivery_date: repair.delivery_date
         };
 
-        const res = await window.api.printUSB(vid, pid, rawData);
+        const res = await printerService.printUSB(vid, pid, rawData);
         if (res.success) {
           toast.success("O.S. Impressa (USB Direto)");
           return;
@@ -94,7 +96,7 @@ export const usePrinter = () => {
       }
 
       // Se não for USB ou falhar, tenta o método HTML (Driver do Sistema)
-      await window.api.printRepairReceipt({ repair, storeName, logo });
+      await printerService.printRepairReceipt({ repair, storeName, logo });
       toast.success("O.S. enviada para impressão!");
     } catch (error) {
       console.error("Erro ao imprimir OS:", error);

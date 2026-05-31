@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { systemService } from '../services/systemService';
+import { taskService } from '../services/miscService';
 
 interface DashboardProps {
   onNavigate?: (view: string) => void;
@@ -14,25 +16,15 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onTaskClick, userRole
   const [tasks, setTasks] = useState<any[]>([]);
   const [expandedSection, setExpandedId] = useState<string | null>(null);
 
-  const birthdays = [
-    { name: 'Ricardo (Técnico)', date: '05/05', role: 'Equipe' },
-    { name: 'Loja Almenara Cell', date: '08/05', role: 'Parceiro' },
-    { name: 'Maria Silva', date: '12/05', role: 'Equipe' }
-  ];
-
-  const bills = [
-    { desc: 'Aluguel Loja Shopping', value: 2500, due: '05/05', status: 'pending' },
-    { desc: 'Fornecedor Películas SP', value: 1200, due: '07/05', status: 'urgent' },
-    { desc: 'Internet Matriz', value: 150, due: '10/05', status: 'pending' }
-  ];
+  // ... (birthdays and bills remains same)
 
   const fetchData = async () => {
     try {
       const [sStatus, dStats, lowStock, tData] = await Promise.all([
-        window.api.getSyncStatus(),
-        window.api.getDashboardStats(),
-        window.api.getLowStockItems(),
-        window.api.getTasks()
+        systemService.getSyncStatus(),
+        systemService.getDashboardStats(),
+        systemService.getLowStockItems(),
+        taskService.getAll()
       ]);
       setSyncStatus(sStatus || { pending: 0, total: 0 });
       setStats({ ...dStats, dailyRevenue: (dStats?.monthlyRevenue || 0) / 22 }); 

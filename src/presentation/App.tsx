@@ -25,6 +25,8 @@ import { usePrinter } from './hooks/usePrinter';
 import TitleBar from './components/TitleBar';
 import { storeService } from './services/storeService';
 import { taskService, settingService } from './services/miscService';
+import { productService } from './services/productService';
+import { saleService } from './services/saleService';
 import { isElectron } from './services/api';
 
 const adjustColor = (color: string, amount: number) => {
@@ -182,7 +184,7 @@ const App: React.FC = () => {
   const processarCodigo = async (codigo: string) => {
     if (!codigo) return;
     try {
-      const produto = await window.api.getProductByBarcode(codigo, lojaId);
+      const produto = await productService.getByBarcode(codigo);
       if (produto) {
         // Notificação de estoque multiloja dinâmica
         toast((t) => (
@@ -295,7 +297,7 @@ const App: React.FC = () => {
     
     const loadingId = toast.loading('Finalizando venda...');
     try {
-      const result = await window.api.saveSale(saleData);
+      const result = await saleService.save(saleData);
       if (result.success) {
         toast.success('VENDA CONCLUÍDA!', { id: loadingId });
         

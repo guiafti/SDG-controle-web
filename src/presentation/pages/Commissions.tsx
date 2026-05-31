@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
+import { financialService } from '../services/financialService';
 
 const Commissions: React.FC = () => {
   const [commissions, setCommissions] = useState<any[]>([]);
 
   const fetchCommissions = async () => {
     try {
-      const data = await window.api.getCommissions();
+      const data = await financialService.getCommissions();
       setCommissions(data || []);
     } catch (e) {
       console.error(e);

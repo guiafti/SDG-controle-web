@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { financialService } from '../services/financialService';
 
 const Analytics: React.FC = () => {
   const [loading, setLoading] = useState(true);
@@ -10,7 +11,7 @@ const Analytics: React.FC = () => {
     setLoading(true);
     try {
       // Usando os dados existentes para gerar perspectivas
-      const data = await window.api.getFinancialSummary();
+      const data = await financialService.getSummary();
       setSummary(data);
     } catch (e) {
       toast.error('Erro ao processar inteligência preditiva');

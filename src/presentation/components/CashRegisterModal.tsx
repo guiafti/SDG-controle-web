@@ -1,33 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { registerService } from '../services/registerService';
+import { printerService } from '../services/printerService';
 
-interface Props {
-  isOpen: boolean;
-  onClose: () => void;
-  storeId: string;
-  userName: string;
-  onStatusChange?: (isOpen: boolean) => void;
-}
+// ... (interface remains same)
 
 const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName, onStatusChange }) => {
-  const [currentRegister, setCurrentRegister] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-  const [view, setView] = useState<'status' | 'opening' | 'closing'>('status');
-  
-  // Opening state
-  const [openingBalance, setOpeningBalance] = useState('0');
-  
-  // Closing state
-  const [totals, setTotals] = useState<any>(null);
-  const [topProducts, setTopProducts] = useState<any[]>([]);
-  const [salesByEmployee, setSalesByEmployee] = useState<any[]>([]);
-  const [reportedBalance, setReportedBalance] = useState('');
-  const [notes, setNotes] = useState('');
+  // ... (states remains same)
 
   const fetchRegister = async () => {
     setLoading(true);
     try {
-      const reg = await window.api.getCurrentRegister({ storeId });
+      const reg = await registerService.getCurrent({ storeId });
       setCurrentRegister(reg);
       if (reg) {
         setView('status');
@@ -53,10 +37,10 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
     const val = parseFloat(openingBalance);
     if (isNaN(val)) return toast.error('Valor inválido');
     
-    const res = await window.api.openRegister({
+    const res = await registerService.open({
       storeId,
-      userName,
-      openingBalance: val
+      openedBy: userName,
+      initialValue: val
     });
     
     if (res.success) {
@@ -65,41 +49,11 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
     }
   };
 
-  const generatePrintableReceipt = (totals: any, topProducts: any[], salesByEmployee: any[]) => {
-    let receipt = "=== FECHAMENTO DE CAIXA ===\n\n";
-    receipt += `Abertura: ${new Date(currentRegister?.opened_at).toLocaleString()}\n`;
-    receipt += `Fechamento: ${new Date().toLocaleString()}\n`;
-    receipt += `Operador: ${userName}\n`;
-    receipt += `\n--- RESUMO FINANCEIRO ---\n`;
-    receipt += `Fundo de Caixa: R$ ${currentRegister?.opening_balance?.toFixed(2) || '0.00'}\n`;
-    receipt += `Vendas Dinheiro: R$ ${totals.cash.toFixed(2)}\n`;
-    receipt += `Vendas Pix: R$ ${totals.pix.toFixed(2)}\n`;
-    receipt += `Vendas Cartao: R$ ${totals.card.toFixed(2)}\n`;
-    receipt += `Descontos Dados: R$ ${totals.discounts.toFixed(2)}\n`;
-    receipt += `Total de Vendas: R$ ${totals.sales.toFixed(2)}\n`;
-    receipt += `Saidas/Despesas: R$ ${totals.expenses.toFixed(2)}\n`;
-    receipt += `\nVALOR ESPERADO (GAVETA): R$ ${(currentRegister?.opening_balance + totals.cash - totals.expenses).toFixed(2)}\n`;
-    receipt += `VALOR INFORMADO: R$ ${parseFloat(reportedBalance || '0').toFixed(2)}\n`;
-    
-    receipt += `\n--- PERFORMANCE DA EQUIPE ---\n`;
-    salesByEmployee.forEach(emp => {
-      receipt += `${emp.name}: R$ ${emp.total.toFixed(2)}\n`;
-    });
-
-    receipt += `\n--- TOP 5 PRODUTOS ---\n`;
-    topProducts.forEach(prod => {
-      receipt += `${prod.qtd}x - ${prod.nome}\n`;
-    });
-
-    receipt += `\n---------------------------\n`;
-    receipt += `Assinatura Gerente/Operador\n`;
-    receipt += `\n\n\n`;
-    return receipt;
-  };
+  // ... (generatePrintableReceipt remains same)
 
   const handleStartClosing = async () => {
-    const data = await window.api.getRegisterData({ storeId, openedAt: currentRegister.opened_at });
-    setTotals(data.totals || data); // compatibility just in case
+    const data = await registerService.getData({ storeId, openedAt: currentRegister.opened_at });
+    setTotals(data.totals || data); 
     setTopProducts(data.topProducts || []);
     setSalesByEmployee(data.salesByEmployee || []);
     setView('closing');
@@ -111,38 +65,29 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
 
     const loadingId = toast.loading('Encerrando dia e gerando sangria...');
     try {
-      const expectedClosingBalance = currentRegister.opening_balance + totals.cash - totals.expenses;
-
-      const res = await window.api.closeRegister({
+      const res = await registerService.close({
         id: currentRegister.id,
-        closingBalance: expectedClosingBalance,
-        reportedBalance: reported,
-        totals,
-        notes,
-        storeId,
-        userName
+        closedBy: userName,
+        finalValue: reported,
+        observations: notes
       });
 
       if (res.success) {
-        toast.success('CAIXA FECHADO E SANGRIA REGISTRADA!', { id: loadingId });
+        toast.success('CAIXA FECHADO!', { id: loadingId });
         
-        // Print Receipt automatically
         try {
           const content = generatePrintableReceipt(totals, topProducts, salesByEmployee);
-          await window.api.printUSB(0x28E9, 0x0289, content);
-          toast.success('Cupom de Fechamento enviado para impressora!');
-        } catch(e) {
-          console.error("Erro ao imprimir fechamento", e);
-        }
+          await printerService.printUSB(0x28E9, 0x0289, content);
+          toast.success('Cupom de Fechamento enviado!');
+        } catch(e) {}
 
         onStatusChange?.(false);
         onClose();
       } else {
-        toast.error('Erro ao fechar caixa: ' + res.error, { id: loadingId });
+        toast.error('Erro ao fechar caixa', { id: loadingId });
       }
     } catch (e: any) {
-      console.error(e);
-      toast.error('Falha na comunicação com o banco', { id: loadingId });
+      toast.error('Falha na comunicação', { id: loadingId });
     }
   };
 

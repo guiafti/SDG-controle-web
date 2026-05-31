@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { customerService } from '../services/customerService';
+import { saleService } from '../services/saleService';
+import { repairService } from '../services/repairService';
 
 interface CRMProps {
   currentUser?: { id: string, name: string, role: string };
@@ -30,7 +33,7 @@ const CRM: React.FC<CRMProps> = ({ currentUser, currentStoreId }) => {
   const fetchCustomers = async () => {
     setLoading(true);
     try {
-      const data = await window.api.getCustomers();
+      const data = await customerService.getAll();
       setCustomers(data || []);
       // Se tiver um cliente selecionado, atualiza ele na lista também
       if (selectedCustomer) {
@@ -49,8 +52,8 @@ const CRM: React.FC<CRMProps> = ({ currentUser, currentStoreId }) => {
     setLoading(true);
     try {
       const [sales, repairs] = await Promise.all([
-        window.api.getSalesByCustomer(customer.id),
-        window.api.getRepairsByCustomer(customer.id)
+        saleService.getByCustomer(customer.id),
+        repairService.getByCustomer(customer.id)
       ]);
       
       setPurchaseHistory(sales || []);
@@ -84,7 +87,7 @@ const CRM: React.FC<CRMProps> = ({ currentUser, currentStoreId }) => {
     
     const loadingId = toast.loading('Processando registro...');
     try {
-      const result = await window.api.saveCustomer({
+      const result = await customerService.save({
         id: isEditing && selectedCustomer ? selectedCustomer.id : null,
         name: formName,
         phone: formPhone,
@@ -100,7 +103,7 @@ const CRM: React.FC<CRMProps> = ({ currentUser, currentStoreId }) => {
         await fetchCustomers();
         if (!isEditing) {
             // Se era novo cliente, busca ele pra selecionar
-            const all = await window.api.getCustomers();
+            const all = await customerService.getAll();
             const last = all.find((c: any) => c.name === formName.toUpperCase());
             if (last) selectCustomer(last);
         }

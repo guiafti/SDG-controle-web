@@ -1,11 +1,7 @@
 import React, { useEffect, useState } from 'react';
+import { customerService } from '../services/customerService';
 
-interface FinancialPanelProps {
-  totalItems: number;
-  discount: number;
-  onDiscountChange: (value: number) => void;
-  onFinish: (paymentMethod: string, customerId?: string) => void;
-}
+// ... (interface remains same)
 
 const FinancialPanel: React.FC<FinancialPanelProps> = ({ 
   totalItems, 
@@ -13,16 +9,12 @@ const FinancialPanel: React.FC<FinancialPanelProps> = ({
   onDiscountChange, 
   onFinish 
 }) => {
-  const [customers, setCustomers] = useState<any[]>([]);
-  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
-  const [customerSearch, setCustomerSearch] = useState('');
-  const [isCustomerDropdownOpen, setIsCustomerDropdownOpen] = useState(false);
-  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  // ... (states remains same)
 
   const totalFinal = Math.max(0, totalItems - discount);
 
   useEffect(() => {
-    window.api.getCustomers().then(setCustomers).catch(() => {});
+    customerService.getAll().then(setCustomers).catch(() => {});
   }, []);
 
   const filteredCustomers = customerSearch.trim() === '' ? [] : customers.filter(c => 

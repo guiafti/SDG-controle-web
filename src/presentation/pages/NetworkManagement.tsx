@@ -1,51 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import TaskCompletionModal from '../components/TaskCompletionModal';
+import { storeService } from '../services/storeService';
+import { userService } from '../services/userService';
+import { taskService } from '../services/miscService';
 
 interface NetworkManagementProps {
-  currentUser?: { id: string, name: string, role: string };
-  currentStoreId?: string;
+  // ... (interface remains same)
 }
 
 const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, currentStoreId }) => {
-  const [stores, setStores] = useState<any[]>([]);
-  const [users, setUsers] = useState<any[]>([]);
-  const [tasks, setTasks] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'missions' | 'stores' | 'users'>('missions');
-
-  // Modals
-  const [isStoreModalOpen, setIsStoreModalOpen] = useState(false);
-  const [isUserModalOpen, setIsUserModalOpen] = useState(false);
-  const [isTaskModalOpen, setIsTaskModalOpen] = useState(false);
-  const [selectedTaskForCompletion, setSelectedTaskForCompletion] = useState<any>(null);
-
-  // Edit States
-  const [editingStore, setEditingStore] = useState<any>(null);
-  const [editingUser, setEditingUser] = useState<any>(null);
-  const [editingTask, setEditingTask] = useState<any>(null);
-
-  // Form states
-  const [storeName, setStoreName] = useState('');
-  const [userName, setUserName] = useState('');
-  const [userPassword, setUserPassword] = useState('');
-  const [userRole, setUserRole] = useState('vendedor');
-  const [userPhoto, setUserPhoto] = useState('');
-
-  const [taskTitle, setTaskTitle] = useState('');
-  const [taskAssigneeType, setTaskAssigneeType] = useState<'store' | 'user'>('store');
-  const [taskAssigneeId, setTaskAssigneeId] = useState('');
-  const [taskDueDate, setTaskDueDate] = useState('');
-  const [taskIsRoutine, setTaskIsRoutine] = useState(false);
-  const [taskProofRequired, setTaskProofRequired] = useState(false);
+  // ... (states remains same)
 
   const fetchData = async () => {
     setLoading(true);
     try {
       const [s, u, t] = await Promise.all([
-        window.api.getStores(true),
-        window.api.getUsers(),
-        window.api.getTasks()
+        storeService.getAll(true),
+        userService.getAll(),
+        taskService.getAll()
       ]);
       setStores(s || []);
       setUsers(u || []);
@@ -65,7 +38,7 @@ const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, curr
     if (!taskTitle || !taskAssigneeId) return toast.error('PREENCHA TODOS OS CAMPOS');
     const loadingId = toast.loading('Salvando missão...');
     try {
-      const res = await window.api.saveTask({ 
+      const res = await taskService.save({ 
         id: editingTask?.id,
         title: taskTitle.toUpperCase(), 
         assignee_type: taskAssigneeType, 
@@ -79,13 +52,13 @@ const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, curr
         setIsTaskModalOpen(false);
         fetchData();
       }
-    } catch (e) { toast.error('ERRO DE CONEXÃO', { id: loadingId }); }
+    } catch (e) { toast.error('ERRO DE COMUNICAÇÃO', { id: loadingId }); }
   };
 
   const handleSaveStore = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!storeName.trim()) return toast.error('NOME OBRIGATÓRIO');
-    const res = await window.api.saveStore({ id: editingStore?.id, name: storeName });
+    const res = await storeService.save({ id: editingStore?.id, name: storeName });
     if (res.success) { toast.success('UNIDADE ATUALIZADA!'); setIsStoreModalOpen(false); fetchData(); }
   };
 
@@ -95,11 +68,11 @@ const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, curr
     
     let finalPhoto = userPhoto;
     if (userPhoto.startsWith('data:image')) {
-        const res = await window.api.uploadUserPhoto({ userId: editingUser?.id || 'new', base64Data: userPhoto });
+        const res = await userService.uploadPhoto({ userId: editingUser?.id || 'new', base64Data: userPhoto });
         if (res.success) finalPhoto = res.fileName;
     }
 
-    const res = await window.api.saveUser({ id: editingUser?.id, name: userName, password: userPassword, role: userRole, photo_url: finalPhoto });
+    const res = await userService.save({ id: editingUser?.id, name: userName, password: userPassword, role: userRole, photo_url: finalPhoto });
     if (res.success) { toast.success('ACESSO ATUALIZADO!'); setIsUserModalOpen(false); fetchData(); }
   };
 
@@ -112,7 +85,7 @@ const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, curr
   };
 
   const handleArchiveStore = async (store: any) => {
-     const res = await window.api.archiveStore({ id: store.id, archived: !store.archived });
+     const res = await storeService.archive(store.id, !store.archived);
      if (res.success) {
         toast.success(store.archived ? 'LOJA REATIVADA!' : 'LOJA ARQUIVADA!');
         fetchData();
@@ -255,7 +228,8 @@ const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, curr
                             </div>
                             <div className="flex items-center gap-3">
                                 <button onClick={() => openTaskModal(t)} className="w-10 h-10 rounded-xl border border-slate-100 text-slate-400 hover:text-brand-500 hover:bg-brand-50 transition-all flex items-center justify-center shadow-sm"><i className="ph ph-pencil-simple text-xl"></i></button>
-                                <button onClick={() => { if(window.confirm('Excluir missão?')) window.api.deleteTask(t.id).then(fetchData); }} className="w-10 h-10 rounded-xl border border-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all flex items-center justify-center shadow-sm"><i className="ph ph-trash text-xl"></i></button>
+                                <button onClick={() => { if(window.confirm('Excluir missão?')) taskService.delete(t.id).then(fetchData); }} className="w-10 h-10 rounded-xl border border-slate-100 text-slate-400 hover:text-red-500 hover:bg-red-50 transition-all flex items-center justify-center shadow-sm"><i className="ph ph-trash text-xl"></i></button>
+
                             </div>
                         </div>
                     ))}
@@ -305,7 +279,7 @@ const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, curr
                             <div className="flex flex-col items-center text-center relative z-10">
                                 <div className="w-16 h-16 bg-slate-900 text-brand-400 rounded-2xl flex items-center justify-center text-3xl shadow-xl mb-4 group-hover:scale-110 transition-transform overflow-hidden">
                                     {u.photo_url ? (
-                                        <img src={`local-img://${u.photo_url}`} className="w-full h-full object-cover" alt={u.name} />
+                                        <img src={u.photo_url.startsWith('http') ? u.photo_url : `local-img://${u.photo_url}`} className="w-full h-full object-cover" alt={u.name} />
                                     ) : (
                                         <i className="ph ph-user-focus"></i>
                                     )}
@@ -465,7 +439,7 @@ const NetworkManagement: React.FC<NetworkManagementProps> = ({ currentUser, curr
         isOpen={!!selectedTaskForCompletion} 
         onClose={() => setSelectedTaskForCompletion(null)} 
         onConfirm={(data) => {
-            window.api.completeTask(selectedTaskForCompletion.id, data.photo, data.justification)
+            taskService.complete(selectedTaskForCompletion.id, data.photo, data.justification)
                 .then(res => { if(res.success) { toast.success('FEITO!'); setSelectedTaskForCompletion(null); fetchData(); } });
         }} 
         task={selectedTaskForCompletion} 

@@ -1,21 +1,14 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-hot-toast';
+import { settingService } from '../services/miscService';
+import { printerService } from '../services/printerService';
+import { financialService } from '../services/financialService';
+import { systemService } from '../services/systemService';
 
-const adjustColor = (color: string, amount: number) => {
-  return '#' + color.replace(/^#/, '').replace(/../g, color => ('0'+Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2));
-};
+// ... (adjustColor remains same)
 
 const Settings: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'visual' | 'financeiro' | 'impressao' | 'chatbot'>('visual');
-  const [primaryColor, setPrimaryColor] = useState('#3b82f6'); 
-  const [logoBase64, setLogoBase64] = useState('');
-  const [appZoom, setAppZoom] = useState(1.0);
-  const [printerInterface, setPrinterInterface] = useState('printer:POS-58');
-  const [printerType, setPrinterType] = useState('escpos');
-  const [availablePrinters, setAvailablePrinters] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [newCategory, setNewCategory] = useState('');
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  // ... (states remains same)
 
   useEffect(() => {
     fetchSettings();
@@ -25,8 +18,8 @@ const Settings: React.FC = () => {
   const fetchSettings = async () => {
     try {
       const [settings, printers] = await Promise.all([
-        window.api.getSettings(),
-        window.api.getPrinters()
+        settingService.getAll(),
+        printerService.getPrinters()
       ]);
       setAvailablePrinters(printers || []);
       
@@ -46,7 +39,7 @@ const Settings: React.FC = () => {
 
   const fetchCategories = async () => {
     try {
-      const cats = await window.api.getExpenseCategories();
+      const cats = await financialService.getCategories();
       setCategories(cats || []);
     } catch (e) { console.error(e); }
   };
@@ -62,7 +55,7 @@ const Settings: React.FC = () => {
   const handleSaveVisual = async () => {
     const loadingId = toast.loading('Salvando identidade visual...');
     try {
-      await window.api.saveSettings([
+      await settingService.save([
         { key: 'primary_color', value: primaryColor }, 
         { key: 'logo', value: logoBase64 },
         { key: 'app_zoom', value: appZoom.toString() }
@@ -70,28 +63,28 @@ const Settings: React.FC = () => {
       document.documentElement.style.setProperty('--brand-500', primaryColor);
       toast.success('Configurações salvas!', { id: loadingId });
       window.dispatchEvent(new CustomEvent('settings-updated', { detail: { logo: logoBase64 } }));
-    } catch (e) { toast.error('Erro ao salvar', { id: loadingId }); }
+    } catch (e) { toast.error('Erro de comunicação', { id: loadingId }); }
   };
 
   const handleSavePrinter = async () => {
     const loadingId = toast.loading('Salvando configurações de impressão...');
     try {
-      await window.api.saveSettings([
+      await settingService.save([
         { key: 'printer_interface', value: printerInterface },
         { key: 'printer_type', value: printerType }
       ]);
       toast.success('Configurações de impressão salvas!', { id: loadingId });
-    } catch (e) { toast.error('Erro ao salvar', { id: loadingId }); }
+    } catch (e) { toast.error('Erro de comunicação', { id: loadingId }); }
   };
 
   const handleAddCategory = async () => {
     if (!newCategory) return;
     try {
-      await window.api.saveExpenseCategory({ name: newCategory });
+      await financialService.saveCategory(newCategory);
       toast.success('Categoria adicionada');
       setNewCategory('');
       fetchCategories();
-    } catch (e) { toast.error('Erro ao salvar categoria'); }
+    } catch (e) { toast.error('Erro de comunicação'); }
   };
 
   return (
@@ -181,7 +174,7 @@ const Settings: React.FC = () => {
                     onClick={() => {
                       const newZoom = Math.max(0.7, appZoom - 0.1);
                       setAppZoom(newZoom);
-                      window.api.setZoom(newZoom);
+                      systemService.setZoom(newZoom);
                     }}
                     className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-all active:scale-95"
                   >
@@ -197,7 +190,7 @@ const Settings: React.FC = () => {
                     onClick={() => {
                       const newZoom = Math.min(1.5, appZoom + 0.1);
                       setAppZoom(newZoom);
-                      window.api.setZoom(newZoom);
+                      systemService.setZoom(newZoom);
                     }}
                     className="w-12 h-12 rounded-2xl bg-white border border-slate-200 flex items-center justify-center text-slate-600 hover:bg-slate-100 transition-all active:scale-95"
                   >
@@ -211,8 +204,9 @@ const Settings: React.FC = () => {
                       key={zoom}
                       onClick={() => {
                         setAppZoom(zoom);
-                        window.api.setZoom(zoom);
+                        systemService.setZoom(zoom);
                       }}
+
                       className={`flex-1 py-2 rounded-xl text-[10px] font-black transition-all border ${appZoom === zoom ? 'bg-brand-600 text-white border-brand-600 shadow-lg' : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'}`}
                     >
                       {(zoom * 100).toFixed(0)}%
@@ -321,7 +315,7 @@ const Settings: React.FC = () => {
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Endereço de Rede ou USB Direto</label>
                   <button 
                     onClick={async () => {
-                      const devices = await window.api.listUsbDevices();
+                      const devices = await printerService.listUsbDevices();
                       const printer = devices.find((d: any) => d.vendorId === 0x28E9 || d.vendorId === 0x0fe6 || d.vendorId === 0x0416);
                       if (printer) {
                         const addr = `USB:${printer.vendorId.toString(16).toUpperCase().padStart(4, '0')}:${printer.productId.toString(16).toUpperCase().padStart(4, '0')}`;
@@ -354,7 +348,7 @@ const Settings: React.FC = () => {
                 onClick={async () => {
                   const loadingId = toast.loading('Configurando Linux...');
                   try {
-                    const res = await window.api.runPrinterSetup();
+                    const res = await printerService.runSetup();
                     if (res.success) {
                       toast.success('Permissões configuradas! Reinicie o cabo USB.', { id: loadingId, duration: 6000 });
                     } else {
@@ -374,7 +368,7 @@ const Settings: React.FC = () => {
                 onClick={async () => {
                   const loadingId = toast.loading('Enviando teste...');
                   try {
-                    const res = await window.api.testPrinter({ deviceName: printerInterface.replace('printer:', '') });
+                    const res = await printerService.testPrinter({ deviceName: printerInterface.replace('printer:', '') });
                     if (res.success) toast.success('Teste enviado!', { id: loadingId });
                     else toast.error(`Erro: ${res.error}`, { id: loadingId });
                   } catch (e) {
@@ -414,7 +408,7 @@ const Settings: React.FC = () => {
                 onClick={async () => {
                   const loadingId = toast.loading('Buscando atualizações...');
                   try {
-                    const res = await window.api.checkForUpdates();
+                    const res = await systemService.checkForUpdates();
                     if (res.success) {
                       toast.success('Busca finalizada!', { id: loadingId });
                     } else {

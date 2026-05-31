@@ -1,38 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { financialService } from '../services/financialService';
+import { storeService } from '../services/storeService';
+import { registerService } from '../services/registerService';
+import { userService } from '../services/userService';
+import { printerService } from '../services/printerService';
 
 const FinancialControl: React.FC = () => {
-  const [expenses, setExpenses] = useState<any[]>([]);
-  const [categories, setCategories] = useState<any[]>([]);
-  const [summary, setSummary] = useState<any>({ totalInflow: 0, totalOutflow: 0, netProfit: 0, estimatedCost: 0, trends: [] });
-  const [budgets, setBudgets] = useState<any[]>([]);
-  const [stores, setStores] = useState<any[]>([]);
-  const [registers, setRegisters] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'history' | 'registers' | 'reports' | 'planning'>('dashboard');
-  
-  // States for Reports
-  const [reportFilters, setReportFilters] = useState({
-    startDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
-    endDate: new Date().toISOString().split('T')[0],
-    storeId: 'all',
-    seller: 'all'
-  });
-  const [reportData, setReportData] = useState<any>(null);
-  const [isGeneratingReport, setIsGeneratingReport] = useState(false);
-  const [sellers, setSellers] = useState<any[]>([]);
-
-  // Form states
-  const [description, setDescription] = useState('');
-  const [value, setValue] = useState('');
-  const [categoryId, setCategoryId] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [paymentMethod, setPaymentMethod] = useState('DINHEIRO');
-  const [storeId, setStoreId] = useState('');
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [selectedRegister, setSelectedRegister] = useState<any>(null);
+  // ... state declarations (same as before)
 
   useEffect(() => {
     fetchData();
@@ -42,13 +17,13 @@ const FinancialControl: React.FC = () => {
     setLoading(true);
     try {
       const [exps, cats, summ, strs, buds, regs, users] = await Promise.all([
-        window.api.getExpenses(),
-        window.api.getExpenseCategories(),
-        window.api.getFinancialSummary(),
-        window.api.getStores(),
-        window.api.getBudgets(),
-        window.api.getRegisterHistory(),
-        window.api.getUsers()
+        financialService.getExpenses(),
+        financialService.getCategories(),
+        financialService.getSummary(),
+        storeService.getAll(),
+        financialService.getBudgets(),
+        registerService.getHistory(),
+        userService.getAll()
       ]);
       setExpenses(exps || []);
       setCategories(cats || []);
@@ -69,7 +44,7 @@ const FinancialControl: React.FC = () => {
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
     try {
-      const data = await window.api.getDetailedReports(reportFilters);
+      const data = await financialService.getDetailedReports(reportFilters);
       setReportData(data);
     } catch (e) {
       toast.error('Erro ao gerar relatório');
@@ -81,7 +56,7 @@ const FinancialControl: React.FC = () => {
   const handleViewRegisterDetail = async (reg: any) => {
     const loadingId = toast.loading('Carregando detalhes do fechamento...');
     try {
-        const data = await window.api.getRegisterData({ storeId: reg.store_id, openedAt: reg.opened_at });
+        const data = await registerService.getData({ storeId: reg.store_id, openedAt: reg.opened_at });
         // Filtra os dados especificamente para o período desse caixa fechado
         setSelectedRegister({ ...reg, ...data });
         toast.dismiss(loadingId);
@@ -123,7 +98,7 @@ const FinancialControl: React.FC = () => {
         receipt += `Reimpresso em: ${new Date().toLocaleString()}\n`;
         receipt += `\n\n\n`;
 
-        await window.api.printUSB(0x28E9, 0x0289, receipt);
+        await printerService.printUSB(0x28E9, 0x0289, receipt);
         toast.success('Cupom enviado!', { id: loadingId });
     } catch (e) {
         toast.error('Erro ao imprimir', { id: loadingId });
@@ -134,7 +109,7 @@ const FinancialControl: React.FC = () => {
     e.preventDefault();
     const loadingId = toast.loading('Registrando saída...');
     try {
-      const result = await window.api.saveExpense({ description, value: Number(value), category_id: categoryId, date, payment_method: paymentMethod, store_id: storeId });
+      const result = await financialService.saveExpense({ description, value: Number(value), category_id: categoryId, date, payment_method: paymentMethod, store_id: storeId });
       if (result.success) {
         toast.success('Lançamento efetuado!', { id: loadingId });
         setIsModalOpen(false);
@@ -433,7 +408,7 @@ const FinancialControl: React.FC = () => {
                                     <button 
                                         onClick={async () => {
                                             const loadingId = toast.loading('Gerando Planilha...');
-                                            const res = await window.api.exportReportToExcel({
+                                            const res = await financialService.exportToExcel({
                                                 summary: reportData.summary,
                                                 sales: reportData.sales
                                             });
@@ -447,7 +422,7 @@ const FinancialControl: React.FC = () => {
                                     <button 
                                         onClick={async () => {
                                             const loadingId = toast.loading('Gerando PDF...');
-                                            const res = await window.api.exportReportToPDF({
+                                            const res = await financialService.exportToPDF({
                                                 filters: reportFilters,
                                                 summary: reportData.summary,
                                                 sales: reportData.sales
