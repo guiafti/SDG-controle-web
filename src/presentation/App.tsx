@@ -23,6 +23,9 @@ import { CartItem } from '../domain/CartItem';
 import { usePrinter } from './hooks/usePrinter';
 
 import TitleBar from './components/TitleBar';
+import { storeService } from './services/storeService';
+import { taskService, settingService } from './services/miscService';
+import { isElectron } from './services/api';
 
 const adjustColor = (color: string, amount: number) => {
   return '#' + color.replace(/^#/, '').replace(/../g, color => ('0'+Math.min(255, Math.max(0, parseInt(color, 16) + amount)).toString(16)).substr(-2));
@@ -64,7 +67,7 @@ const App: React.FC = () => {
 
   const fetchTasks = async () => {
     try {
-      const data = await window.api.getTasks();
+      const data = await taskService.getAll();
       setTasks(data || []);
     } catch (e) { console.error(e); }
   };
@@ -80,15 +83,16 @@ const App: React.FC = () => {
     if (t.status !== 'pending') return false;
     if (userRole === 'admin') return true;
     if (t.assignee_id === 'all') return true;
-    return (t.assignee_type === 'store' && t.assignee_id === lojaId) || 
+    return (t.assignee_id === 'all') || 
+           (t.assignee_type === 'store' && t.assignee_id === lojaId) || 
            (t.assignee_type === 'user' && (t.assignee_id === vendedor));
   }).length;
 
   const loadSettings = async () => {
     try {
       const [settings, sData] = await Promise.all([
-        window.api.getSettings(),
-        window.api.getStores()
+        settingService.getAll(),
+        storeService.getAll()
       ]);
       setStores(sData || []);
       const colorSetting = settings.find((s: any) => s.key === 'primary_color');
