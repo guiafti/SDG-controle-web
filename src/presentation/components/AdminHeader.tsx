@@ -23,7 +23,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ title, userPhoto }) => {
 
           <div className="w-12 h-12 rounded-2xl bg-brand-50 border border-brand-100 overflow-hidden shadow-inner flex items-center justify-center">
             {userPhoto ? (
-              <img src={`local-img://${userPhoto}`} className="w-full h-full object-cover" />
+              <img src={userPhoto.startsWith('http') ? userPhoto : `local-img://${userPhoto}`} className="w-full h-full object-cover" />
             ) : (
               <i className="ph ph-user text-brand-400 text-xl"></i>
             )}

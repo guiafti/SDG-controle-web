@@ -21,13 +21,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onTaskClick, userRole
   const fetchData = async () => {
     try {
       const [sStatus, dStats, lowStock, tData] = await Promise.all([
-        systemService.getSyncStatus(),
-        systemService.getDashboardStats(),
-        systemService.getLowStockItems(),
-        taskService.getAll()
+        systemService.getSyncStatus().catch(() => ({ pending: 0, total: 0 })),
+        systemService.getDashboardStats().catch(() => ({ totalRevenue: 0, monthlyRevenue: 0 })),
+        systemService.getLowStockItems().catch(() => []),
+        taskService.getAll().catch(() => [])
       ]);
       setSyncStatus(sStatus || { pending: 0, total: 0 });
-      setStats({ ...dStats, dailyRevenue: (dStats?.monthlyRevenue || 0) / 22 }); 
+      setStats({ 
+        totalRevenue: dStats?.totalRevenue || 0,
+        monthlyRevenue: dStats?.monthlyRevenue || 0,
+        dailyRevenue: (dStats?.monthlyRevenue || 0) / 22 
+      }); 
       setLowStockItems(lowStock || []);
       setTasks(tData || []);
 

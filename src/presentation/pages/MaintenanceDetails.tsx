@@ -172,8 +172,8 @@ const MaintenanceDetails: React.FC<MaintenanceDetailsProps> = ({ order, stores, 
               <div className="space-y-4">
                 <h3 className="text-[11px] font-bold text-slate-400 uppercase tracking-[0.2em] border-b border-slate-100 pb-2">Evidências Visuais</h3>
                 {order.photo_url ? (
-                    <div className="relative w-32 h-32 group cursor-pointer" onClick={() => window.open(`local-img://${order.photo_url}`)}>
-                      <img src={`local-img://${order.photo_url}`} className="w-full h-full object-cover rounded-xl border border-slate-200 shadow-sm transition-all" alt="Device" />
+                    <div className="relative w-32 h-32 group cursor-pointer" onClick={() => window.open(order.photo_url?.startsWith('http') ? order.photo_url : `local-img://${order.photo_url}`)}>
+                      <img src={order.photo_url?.startsWith('http') ? order.photo_url : `local-img://${order.photo_url}`} className="w-full h-full object-cover rounded-xl border border-slate-200 shadow-sm transition-all" alt="Device" />
                       <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 rounded-xl flex items-center justify-center transition-all">
                         <i className="ph ph-magnifying-glass-plus text-white text-xl"></i>
                       </div>

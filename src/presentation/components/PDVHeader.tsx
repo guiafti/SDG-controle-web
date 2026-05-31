@@ -161,7 +161,7 @@ const PDVHeader: React.FC<PDVHeaderProps> = ({
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-100 uppercase tracking-tight">
                   <div className="w-8 h-8 rounded-full bg-brand-500/20 border border-brand-500/30 flex items-center justify-center text-brand-400 overflow-hidden">
                     {userPhoto ? (
-                      <img src={`local-img://${userPhoto}`} className="w-full h-full object-cover" />
+                      <img src={userPhoto.startsWith('http') ? userPhoto : `local-img://${userPhoto}`} className="w-full h-full object-cover" />
                     ) : (
                       <i className="ph ph-user text-lg"></i>
                     )}

@@ -259,7 +259,7 @@ const Repairs: React.FC = () => {
                   >
                     <div className="w-10 h-10 rounded-lg bg-slate-50 flex-none flex items-center justify-center text-slate-400 overflow-hidden border border-slate-100">
                       {r.photo_url ? (
-                        <img src={`local-img://${r.photo_url}`} className="w-full h-full object-cover" alt="OS" />
+                        <img src={r.photo_url.startsWith('http') ? r.photo_url : `local-img://${r.photo_url}`} className="w-full h-full object-cover" alt="OS" />
                       ) : (
                         <i className="ph ph-wrench text-xl"></i>
                       )}
