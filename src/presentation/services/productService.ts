@@ -21,14 +21,36 @@ export const productService = {
   },
 
   async getByBarcode(barcode: string) {
-    if (!supabase) return null;
-    const { data, error } = await supabase
-      .from('products')
-      .select('*')
-      .or(`barcode.eq.${barcode},extra_barcodes.ilike.%${barcode}%`)
-      .maybeSingle();
-    if (error) return null;
-    return data;
+    if (!supabase || !barcode) return null;
+    
+    const cleanBarcode = barcode.trim();
+    console.log(`[PRODUCT] Buscando código: ${cleanBarcode}`);
+
+    try {
+      // 1. Tenta busca exata pelo código principal
+      let { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .eq('barcode', cleanBarcode)
+        .maybeSingle();
+
+      if (data) return data;
+
+      // 2. Se não achar, tenta busca nos códigos extras (formato JSON ou texto)
+      let { data: extraData } = await supabase
+        .from('products')
+        .select('*')
+        .ilike('extra_barcodes', `%${cleanBarcode}%`)
+        .maybeSingle();
+
+      if (extraData) return extraData;
+
+      console.warn(`[PRODUCT] Nenhum produto encontrado para: ${cleanBarcode}`);
+      return null;
+    } catch (e) {
+      console.error(`[PRODUCT] Erro na busca por código:`, e);
+      return null;
+    }
   },
 
   async saveManual(product: any) {
