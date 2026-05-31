@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import clsx from 'clsx';
+import { isElectron } from '../services/api';
 
 interface TitleBarProps {
   logo?: string;
@@ -15,32 +16,45 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
   }>({ type: 'idle' });
 
   useEffect(() => {
+    if (!isElectron) {
+      setIsOnline(true); // Na web estamos sempre "online" em relação ao Supabase
+      return;
+    }
+
     const updateStatus = async () => {
-      const appTitle = await window.api.getAppTitle();
-      const configured = await window.api.isCloudConfigured();
-      setTitle(appTitle);
-      setIsOnline(configured);
+      try {
+        const appTitle = await window.api.getAppTitle();
+        const configured = await window.api.isCloudConfigured();
+        setTitle(appTitle);
+        setIsOnline(configured);
+      } catch (e) {}
     };
 
     updateStatus();
     const interval = setInterval(updateStatus, 5000);
 
-    // Listeners de Atualização
-    const unAvailable = window.api.onUpdateAvailable((info) => {
-      setUpdateStatus({ type: 'available', version: info.version });
-    });
+    // Listeners de Atualização (Só Electron)
+    let unAvailable = () => {};
+    let unProgress = () => {};
+    let unDownloaded = () => {};
 
-    const unProgress = window.api.onUpdateProgress((progress) => {
-      setUpdateStatus(prev => ({ 
-        ...prev, 
-        type: 'downloading', 
-        progress: progress.percent 
-      }));
-    });
+    try {
+      unAvailable = window.api.onUpdateAvailable((info) => {
+        setUpdateStatus({ type: 'available', version: info.version });
+      });
 
-    const unDownloaded = window.api.onUpdateDownloaded((info) => {
-      setUpdateStatus({ type: 'ready', version: info.version });
-    });
+      unProgress = window.api.onUpdateProgress((progress) => {
+        setUpdateStatus(prev => ({ 
+          ...prev, 
+          type: 'downloading', 
+          progress: progress.percent 
+        }));
+      });
+
+      unDownloaded = window.api.onUpdateDownloaded((info) => {
+        setUpdateStatus({ type: 'ready', version: info.version });
+      });
+    } catch (e) {}
 
     return () => {
       clearInterval(interval);
@@ -52,8 +66,11 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
 
   return (
     <div 
-      className="h-10 w-full bg-slate-900 flex items-center justify-between px-4 select-none shrink-0 border-b border-slate-800 z-[999] relative" 
-      style={{ WebkitAppRegion: 'drag' } as any}
+      className={clsx(
+        "h-10 w-full bg-slate-900 flex items-center justify-between px-4 select-none shrink-0 border-b border-slate-800 z-[999] relative",
+        !isElectron && "hidden" // Oculta barra de título na web se desejar, ou mantém sem botões
+      )} 
+      style={isElectron ? { WebkitAppRegion: 'drag' } as any : {}}
     >
       <div className="flex items-center gap-3 text-slate-400">
         {logo ? (
@@ -75,7 +92,7 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
         </div>
 
         {/* Barra de Progresso de Atualização */}
-        {updateStatus.type !== 'idle' && (
+        {isElectron && updateStatus.type !== 'idle' && (
           <div className="flex items-center gap-3 ml-4 px-3 py-1 bg-slate-800/50 rounded-full border border-slate-700/50 animate-in fade-in slide-in-from-left-2">
             <i className={clsx(
               "ph text-sm",
@@ -101,29 +118,31 @@ const TitleBar: React.FC<TitleBarProps> = ({ logo }) => {
         )}
       </div>
       
-      <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as any}>
-        <button 
-          onClick={() => window.api.minimizeWindow()} 
-          className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
-          title="Minimizar"
-        >
-          <i className="ph ph-minus"></i>
-        </button>
-        <button 
-          onClick={() => window.api.maximizeWindow()} 
-          className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
-          title="Maximizar / Restaurar"
-        >
-          <i className="ph ph-square"></i>
-        </button>
-        <button 
-          onClick={() => window.api.closeWindow()} 
-          className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-red-500 rounded transition-colors"
-          title="Fechar Sistema"
-        >
-          <i className="ph ph-x"></i>
-        </button>
-      </div>
+      {isElectron && (
+        <div className="flex items-center gap-1" style={{ WebkitAppRegion: 'no-drag' } as any}>
+          <button 
+            onClick={() => window.api.minimizeWindow()} 
+            className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            title="Minimizar"
+          >
+            <i className="ph ph-minus"></i>
+          </button>
+          <button 
+            onClick={() => window.api.maximizeWindow()} 
+            className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 rounded transition-colors"
+            title="Maximizar / Restaurar"
+          >
+            <i className="ph ph-square"></i>
+          </button>
+          <button 
+            onClick={() => window.api.closeWindow()} 
+            className="w-10 h-8 flex items-center justify-center text-slate-400 hover:text-white hover:bg-red-500 rounded transition-colors"
+            title="Fechar Sistema"
+          >
+            <i className="ph ph-x"></i>
+          </button>
+        </div>
+      )}
     </div>
   );
 };
