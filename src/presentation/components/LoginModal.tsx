@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from 'react';
+import { storeService } from '../services/storeService';
+import { userService } from '../services/userService';
 
 interface LoginModalProps {
   isOpen: boolean;
@@ -18,10 +20,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onLogin, onGoToAdmin })
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const s = await window.api.getStores();
-        const u = await window.api.getUsers();
-        setStores(s);
-        setUsers(u);
+        const s = await storeService.getAll();
+        const u = await userService.getAll();
+        setStores(s || []);
+        setUsers(u || []);
       } catch (e) {
         console.error('Erro ao carregar dados de login:', e);
       }
@@ -45,7 +47,7 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onLogin, onGoToAdmin })
     setError('');
 
     try {
-      const user = await window.api.login({ username: vendedor, password });
+      const user = await userService.login({ username: vendedor, password });
       if (user) {
         const selectedStore = stores.find(s => String(s.id) === String(lojaId));
         if (selectedStore) {
@@ -72,7 +74,10 @@ const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onLogin, onGoToAdmin })
         <div className="text-center mb-6">
           <div className="w-20 h-20 bg-brand-100 text-brand-600 rounded-3xl flex items-center justify-center text-3xl mx-auto mb-4 overflow-hidden border-2 border-brand-200">
             {selectedUserPhoto ? (
-              <img src={`local-img://${selectedUserPhoto}`} className="w-full h-full object-cover" />
+              <img 
+                src={selectedUserPhoto.startsWith('http') ? selectedUserPhoto : `local-img://${selectedUserPhoto}`} 
+                className="w-full h-full object-cover" 
+              />
             ) : (
               <i className="ph ph-lock-key"></i>
             )}
