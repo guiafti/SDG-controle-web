@@ -2,7 +2,7 @@
   "name": "pdv-grupo-import",
   "version": "1.1.8",
   "main": "dist/main/main.js",
-  "description": "Sistema de PDV Desktop Offline-first",
+  "description": "Sistema de PDV Desktop Cloud-only",
   "repository": {
     "type": "git",
     "url": "https://github.com/Marcelaun/SDG_Controle_Gui.git"
@@ -10,12 +10,11 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build:ui": "vite build",
-    "build:main": "npx esbuild src/main/main.ts --bundle --platform=node --external:electron --external:better-sqlite3 --external:node-thermal-printer --external:usb --outfile=dist/main/main.js && npx esbuild src/main/preload.ts --bundle --platform=node --external:electron --outfile=dist/main/preload.js",
+    "build:main": "npx esbuild src/main/main.ts --bundle --platform=node --external:electron --external:node-thermal-printer --external:usb --outfile=dist/main/main.js && npx esbuild src/main/preload.ts --bundle --platform=node --external:electron --outfile=dist/main/preload.js",
     "electron:dev": "npm run build:main && npx concurrently -n vite,electron -c green,blue \"npm run dev\" \"wait-on tcp:127.0.0.1:5173 && npx electron .\"",
     "dist": "npm run build:ui && npm run build:main && electron-builder",
     "release": "node scripts/release.js",
-    "rebuild": "electron-rebuild -f",
-    "reset-db": "node reset-db.js"
+    "rebuild": "electron-rebuild -f"
   },
   "build": {
     "appId": "com.sdg.controle",
@@ -39,9 +38,6 @@
       ".env"
     ],
     "asar": true,
-    "asarUnpack": [
-      "**/node_modules/better-sqlite3/**/*"
-    ],
     "win": {
       "target": "nsis",
       "icon": "logo.jpg"
@@ -56,7 +52,6 @@
     "@phosphor-icons/web": "^2.0.2",
     "@supabase/ssr": "^0.10.2",
     "@supabase/supabase-js": "^2.105.1",
-    "better-sqlite3": "^12.9.0",
     "clsx": "^2.0.0",
     "dotenv": "^17.4.2",
     "electron-updater": "^6.8.3",
