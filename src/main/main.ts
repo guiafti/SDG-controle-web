@@ -12,12 +12,34 @@ import { randomUUID } from 'node:crypto';
 import * as dotenv from 'dotenv';
 
 // Carrega as variáveis de ambiente o mais cedo possível
-const envPath = app.isPackaged 
-  ? path.join(process.resourcesPath, '.env') 
-  : path.join(process.cwd(), '.env');
-if (fs.existsSync(envPath)) {
-  dotenv.config({ path: envPath });
-}
+const loadEnv = () => {
+  try {
+    const resourcesEnv = app.isPackaged 
+      ? path.join(process.resourcesPath, '.env') 
+      : path.join(process.cwd(), '.env');
+    
+    let userDataEnv = '';
+    try {
+      userDataEnv = path.join(app.getPath('userData'), '.env');
+    } catch (e) {
+      console.log('[ENV] app.getPath(userData) ainda não disponível.');
+    }
+    
+    if (userDataEnv && fs.existsSync(userDataEnv)) {
+      dotenv.config({ path: userDataEnv });
+      console.log('[ENV] Carregado de userData:', userDataEnv);
+    } else if (fs.existsSync(resourcesEnv)) {
+      dotenv.config({ path: resourcesEnv });
+      console.log('[ENV] Carregado de resources:', resourcesEnv);
+    } else {
+      console.warn('[ENV] Nenhum arquivo .env encontrado para carregar.');
+    }
+  } catch (err) {
+    console.error('[ENV] Erro crítico ao carregar variáveis de ambiente:', err);
+  }
+};
+
+loadEnv();
 
 // --- CONFIGURAÇÃO DE PROTOCOLO DE IMAGEM ---
 protocol.registerSchemesAsPrivileged([{ 
@@ -76,19 +98,20 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Configura os protocolos primeiro
   protocol.handle('local-img', async (request) => {
-    const fileName = path.basename(decodeURIComponent(request.url.replace('local-img://', '')));
+    // ... (mantém o código do handler que já otimizamos)
+    let rawUrl = request.url.replace('local-img://', '');
+    if (rawUrl.endsWith('/')) rawUrl = rawUrl.slice(0, -1);
+    const fileName = path.basename(decodeURIComponent(rawUrl));
     
-    // Lista de caminhos para busca local
     const possiblePaths = [
       path.join(app.getPath('userData'), 'product_images', fileName),
       path.join(app.getPath('userData'), 'repair_images', fileName),
       path.join(process.cwd(), fileName),
       path.join(process.cwd(), 'product_images', fileName),
       path.join(process.cwd(), 'public', fileName),
-      path.join(process.cwd(), 'dist', 'client', fileName),
-      path.join(__dirname, '..', 'public', fileName),
-      path.join(__dirname, '..', 'renderer', fileName)
+      path.join(__dirname, '..', 'public', fileName)
     ];
 
     for (const filePath of possiblePaths) {
@@ -97,10 +120,8 @@ app.whenReady().then(async () => {
       }
     }
 
-    // Fallback para Supabase se não achar local
     const supabaseUrl = process.env.SUPABASE_URL;
     if (supabaseUrl && fileName && fileName !== 'undefined' && fileName !== 'null') {
-      // Tenta em diferentes baldes e pastas
       const attempts = [
         { bucket: 'product-images', folder: 'products', dir: 'product_images' },
         { bucket: 'product-images', folder: 'users', dir: 'product_images' },
@@ -113,14 +134,11 @@ app.whenReady().then(async () => {
         try {
           const response = await net.fetch(publicUrl);
           if (response.ok) {
-            // Salva localmente em segundo plano para futuras requisições
             const localTarget = path.join(app.getPath('userData'), attempt.dir, fileName);
             if (!fs.existsSync(path.dirname(localTarget))) fs.mkdirSync(path.dirname(localTarget), { recursive: true });
             
             response.clone().arrayBuffer().then(buffer => {
-              fs.writeFile(localTarget, Buffer.from(buffer), (err) => {
-                if (!err) console.log(`[IMAGE] Baixada e salva em ${attempt.dir}: ${fileName}`);
-              });
+              fs.writeFile(localTarget, Buffer.from(buffer), (err) => {});
             }).catch(() => {});
 
             return response;
@@ -128,15 +146,47 @@ app.whenReady().then(async () => {
         } catch (e) {}
       }
     }
-    
     return new Response('Not Found', { status: 404 });
   });
 
+  // Inicializa o banco
   await initDatabase();
-  createWindow();
-  SyncEngine.start();
+  
+  // Cria a janela (inicialmente escondida ou com splash)
+  const win = new BrowserWindow({
+    width: 1200, height: 800, frame: false, titleBarStyle: 'hidden',
+    show: false, // Não mostra ainda
+    webPreferences: { 
+      nodeIntegration: false, 
+      contextIsolation: true, 
+      preload: path.join(__dirname, 'preload.js'),
+      sandbox: false 
+    }
+  });
 
-  // Verifica atualizações 3 segundos após o boot
+  if (!app.isPackaged) {
+    win.loadURL('http://127.0.0.1:5173');
+  } else {
+    win.loadFile(path.join(__dirname, '..', 'index.html'));
+  }
+
+  // --- SINCRONIZAÇÃO INICIAL OBRIGATÓRIA ---
+  console.log('[BOOT] Iniciando sincronização inicial obrigatória...');
+  SyncEngine.init();
+  
+  // Mostra uma mensagem simples de carregamento se possível, 
+  // ou apenas aguarda o pull terminar antes de mostrar a janela principal
+  try {
+    await SyncEngine.pullFromCloud();
+    console.log('[BOOT] Sincronização concluída. Abrindo sistema.');
+  } catch (e) {
+    console.error('[BOOT] Falha na sincronização inicial:', e);
+  }
+
+  win.show(); // Só mostra a janela após o pull terminar
+  SyncEngine.start(); // Inicia o loop de sync contínuo
+
+  // Verifica atualizações
   setTimeout(() => {
     if (app.isPackaged) {
       autoUpdater.checkForUpdatesAndNotify();
@@ -729,7 +779,15 @@ ipcMain.handle('list-usb-devices', async () => {
   return usb.getDeviceList().map((d: any) => ({ vendorId: d.deviceDescriptor.idVendor, productId: d.deviceDescriptor.idProduct }));
 });
 ipcMain.handle('get-app-title', async () => 'SDG CONTROLE');
-ipcMain.handle('is-cloud-configured', async () => true);
+ipcMain.handle('is-cloud-configured', async () => {
+  const url = process.env.SUPABASE_URL;
+  const key = process.env.SUPABASE_ANON_KEY;
+  console.log('[DEBUG] Verificando chaves:', { 
+    url: url ? 'OK (Presente)' : 'FALTA URL', 
+    key: key ? 'OK (Presente)' : 'FALTA KEY' 
+  });
+  return !!(url && key && url !== 'SUA_URL_DO_SUPABASE_AQUI');
+});
 
 ipcMain.handle('get-repairs', async () => await query('SELECT * FROM maintenance_orders ORDER BY created_at DESC'));
 

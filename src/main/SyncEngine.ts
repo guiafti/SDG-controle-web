@@ -22,13 +22,29 @@ export class SyncEngine {
 
   static init() {
     try {
-      const envPath = app.isPackaged 
+      const resourcesEnv = app.isPackaged 
         ? path.join(process.resourcesPath, '.env') 
         : path.join(process.cwd(), '.env');
       
-      if (fs.existsSync(envPath)) {
+      let userDataEnv = '';
+      try {
+        userDataEnv = path.join(app.getPath('userData'), '.env');
+      } catch (e) {}
+      
+      let envPath = '';
+
+      if (userDataEnv && fs.existsSync(userDataEnv)) {
+        envPath = userDataEnv;
+        logSync(`Configuração carregada de userData: ${envPath}`);
+      } else if (fs.existsSync(resourcesEnv)) {
+        envPath = resourcesEnv;
+        logSync(`Configuração carregada de resources: ${envPath}`);
+      }
+
+      if (envPath) {
         dotenv.config({ path: envPath });
-        logSync(`Configuração carregada de ${envPath}`);
+      } else {
+        logSync('AVISO: Nenhum arquivo .env encontrado em userData ou resources.');
       }
 
       this.imagesDir = path.join(app.getPath('userData'), 'product_images');

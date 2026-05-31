@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { storeService } from '../services/storeService';
 
 const Stores: React.FC = () => {
   const [stores, setStores] = useState<any[]>([]);
@@ -10,7 +11,7 @@ const Stores: React.FC = () => {
 
   const fetchStores = async () => {
     try {
-      const data = await window.api.getStores(true); // includeArchived = true
+      const data = await storeService.getAll(true); // includeArchived = true
       setStores(data || []);
     } catch (e) { console.error(e); }
   };
@@ -34,7 +35,7 @@ const Stores: React.FC = () => {
 
     const loadingId = toast.loading('Salvando loja...');
     try {
-      const result = await window.api.saveStore({
+      const result = await storeService.save({
         id: editingStore?.id,
         name: formName
       });
@@ -62,10 +63,7 @@ const Stores: React.FC = () => {
             onClick={async () => {
               toast.dismiss(t.id);
               try {
-                const result = await window.api.archiveStore({
-                  id: store.id,
-                  archived: !store.archived
-                });
+                const result = await storeService.archive(store.id, !store.archived);
                 if (result.success) {
                   toast.success(`Loja ${store.archived ? 'restaurada' : 'arquivada'}!`);
                   fetchStores();
