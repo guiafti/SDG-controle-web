@@ -259,87 +259,74 @@ const Inventory: React.FC<InventoryProps> = ({ role }) => {
 
   return (
     <div className="flex-1 flex flex-col h-full bg-slate-50 overflow-hidden">
-      <main className="p-4 md:p-6 space-y-4 flex-1 overflow-y-auto custom-scrollbar">
+      <main className="p-4 lg:p-8 space-y-4 lg:space-y-6 flex-1 overflow-y-auto custom-scrollbar pb-24 lg:pb-8">
         
-        {/* Compact Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-2">
-          <div className="flex items-center gap-4">
+        {/* Compact Header Responsivo */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
             <div>
-              <h1 className="text-2xl font-bold text-slate-800 tracking-tight">Centro de Distribuição</h1>
-              <p className="text-slate-500 font-medium text-xs mt-0.5 uppercase tracking-widest">Gestão de Inventário Multiloja</p>
-            </div>
-            
-            {/* Guardian Protocol Inline */}
-            <div className="hidden lg:flex items-center gap-2 bg-white p-1 rounded-xl border border-slate-200 shadow-sm ml-4">
-              <select 
-                value={selectedStore} 
-                onChange={(e) => setSelectedStore(e.target.value)}
-                className="bg-transparent text-[10px] font-bold outline-none px-2 uppercase"
-              >
-                {stores.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-              <input type="file" ref={fileInputRef} onChange={onFileChange} accept=".xml" className="hidden" />
-              <button 
-                onClick={handleImportClick}
-                className="bg-slate-900 text-white px-3 py-1.5 rounded-lg font-bold text-[9px] hover:bg-black flex items-center gap-1.5 transition-all"
-              >
-                <i className="ph ph-file-arrow-up"></i>
-                IMPORTAR XML
-              </button>
+              <h1 className="text-xl lg:text-3xl font-black text-slate-800 tracking-tighter italic uppercase">Estoque</h1>
+              <p className="text-slate-400 font-bold text-[9px] lg:text-xs uppercase tracking-widest">Gestão de Inventário Centralizada</p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 w-full sm:w-auto">
             <button 
                 onClick={() => setShowArchived(!showArchived)}
-                className={`px-4 py-2 rounded-xl text-[10px] font-bold uppercase transition-all border ${showArchived ? 'bg-orange-500 text-white border-orange-500' : 'bg-white text-slate-400 border-slate-200 hover:border-slate-300 shadow-sm'}`}
+                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-[10px] font-black uppercase transition-all border ${showArchived ? 'bg-orange-500 text-white border-orange-500 shadow-lg shadow-orange-500/20' : 'bg-white text-slate-400 border-slate-200 shadow-sm'}`}
             >
-                {showArchived ? 'Ver Ativos' : 'Ver Arquivados'}
+                {showArchived ? 'Ver Ativos' : 'Arquivados'}
             </button>
             <button 
                 onClick={() => openModal()}
-                className="bg-brand-500 text-white px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 hover:bg-brand-600 shadow-md shadow-brand-500/20 transition-all"
+                className="flex-1 sm:flex-none bg-brand-500 text-white px-5 py-2.5 rounded-xl font-black text-[10px] lg:text-xs uppercase flex items-center justify-center gap-2 hover:bg-brand-600 shadow-lg shadow-brand-500/20 transition-all"
             >
-                <i className="ph ph-plus-circle text-xl"></i> Adicionar Item
+                <i className="ph ph-plus-circle text-lg"></i> Novo Item
             </button>
           </div>
         </div>
 
-        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2">
-            <div className="flex-none bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3">
-                <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center text-slate-500"><i className="ph ph-barcode text-lg"></i></div>
+        {/* Stats Cards Responsivos */}
+        <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-4 px-4 lg:mx-0 lg:px-0">
+            <div className="flex-none bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3">
+                <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-400"><i className="ph ph-barcode text-xl"></i></div>
                 <div>
-                    <div className="text-xs font-bold text-slate-800">{stats.total}</div>
-                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">SKUs Únicos</div>
+                    <div className="text-lg font-black text-slate-800 leading-none">{stats.total}</div>
+                    <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Total SKUs</div>
                 </div>
             </div>
-            <div className={`flex-none bg-white px-4 py-2 rounded-xl shadow-sm border border-slate-100 flex items-center gap-3 transition-all ${stats.critical > 0 ? 'border-l-4 border-l-red-500 shadow-red-500/5' : ''}`}>
-                <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-lg ${stats.critical > 0 ? 'bg-red-50 text-red-500' : 'bg-slate-100 text-slate-400'}`}>
+            <div className={`flex-none bg-white px-5 py-3 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 transition-all ${stats.critical > 0 ? 'border-l-4 border-l-red-500' : ''}`}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xl ${stats.critical > 0 ? 'bg-red-50 text-red-500' : 'bg-slate-50 text-slate-400'}`}>
                     <i className="ph ph-warning-octagon"></i>
                 </div>
                 <div>
-                    <div className={`text-xs font-bold ${stats.critical > 0 ? 'text-red-600' : 'text-slate-800'}`}>{stats.critical}</div>
-                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Reposição Crítica</div>
+                    <div className={`text-lg font-black leading-none ${stats.critical > 0 ? 'text-red-600' : 'text-slate-800'}`}>{stats.critical}</div>
+                    <div className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-1">Nível Crítico</div>
                 </div>
             </div>
-            <div className="flex-none bg-slate-900 px-5 py-2 rounded-xl shadow-md flex items-center gap-3">
-                <div className="w-8 h-8 bg-white/10 rounded-lg flex items-center justify-center text-brand-400"><i className="ph ph-sparkle text-lg"></i></div>
+            <div className="flex-none bg-slate-900 px-6 py-3 rounded-2xl shadow-xl flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-brand-400"><i className="ph ph-sparkle text-xl"></i></div>
                 <div>
-                    <div className="text-xs font-bold text-white italic">Inteligência</div>
-                    <div className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Análise de Giro</div>
+                    <div className="text-sm font-black text-white italic">Cloud</div>
+                    <div className="text-[8px] font-black text-slate-500 uppercase tracking-widest mt-1">Sincronizado</div>
                 </div>
             </div>
         </div>
 
-        <div className="relative">
-          <i className="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 text-lg"></i>
+        {/* Busca Responsiva */}
+        <div className="relative group">
+          <i className="ph ph-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 text-xl group-focus-within:text-brand-500 transition-colors"></i>
           <input 
-            type="text" placeholder="Localizar produto por nome, EAN ou categoria..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
-            className="w-full bg-white border border-slate-200 rounded-xl py-2.5 pl-11 pr-4 outline-none focus:ring-2 ring-brand-500/10 transition-all text-sm font-medium text-slate-700 shadow-sm"
+            type="text" 
+            placeholder="LOCALIZAR POR NOME OU CÓDIGO..." 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full bg-white border border-slate-100 rounded-2xl py-4 pl-12 pr-4 outline-none focus:ring-4 ring-brand-500/5 focus:border-brand-200 transition-all text-sm font-black text-slate-700 shadow-xl shadow-slate-200/20 uppercase italic"
           />
         </div>
 
-        <div className="space-y-2 pb-10">
+        {/* Lista de Produtos Responsiva */}
+        <div className="space-y-3">
           {filteredProducts.length === 0 ? (
             <div className="py-32 text-center bg-white rounded-2xl border border-slate-100 opacity-40">
               <i className="ph ph-package text-6xl mb-2"></i>

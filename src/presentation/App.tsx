@@ -357,12 +357,12 @@ const App: React.FC = () => {
               isRegisterOpen={isRegisterOpen}
               onOpenRegisterModal={() => setIsRegisterModalOpen(true)}
             />
-            <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4 p-4 w-full max-w-full box-border">
-              <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-hidden">
+            <div className="flex-1 overflow-hidden flex flex-col lg:flex-row gap-4 p-2 lg:p-4 w-full max-w-full box-border pb-20 lg:pb-4">
+              <div className="flex-1 flex flex-col gap-3 min-w-0 overflow-y-auto lg:overflow-hidden">
                 <BarcodeScanner onScan={processarCodigo} onOpenSearch={() => setIsSearchOpen(true)} />
                 <CartList items={carrinho} onUpdateQuantity={updateItemQuantity} logo={logoApp} />
               </div>
-              <div className="flex flex-col gap-4 w-fit h-fit flex-shrink-0">
+              <div className="flex flex-col gap-4 w-full lg:w-fit h-fit flex-shrink-0">
                 <FinancialPanel totalItems={totalVenda} discount={desconto} onDiscountChange={setDesconto} onFinish={handleFinishSale} />
               </div>
             </div>
