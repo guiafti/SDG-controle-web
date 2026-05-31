@@ -16,7 +16,17 @@ const Dashboard: React.FC<DashboardProps> = ({ onNavigate, onTaskClick, userRole
   const [tasks, setTasks] = useState<any[]>([]);
   const [expandedSection, setExpandedId] = useState<string | null>(null);
 
-  // ... (birthdays and bills remains same)
+  const birthdays = [
+    { name: 'Ricardo (Técnico)', date: '05/05', role: 'Equipe' },
+    { name: 'Loja Almenara Cell', date: '08/05', role: 'Parceiro' },
+    { name: 'Maria Silva', date: '12/05', role: 'Equipe' }
+  ];
+
+  const bills = [
+    { desc: 'Aluguel Loja Shopping', value: 2500, due: '05/05', status: 'pending' },
+    { desc: 'Fornecedor Películas SP', value: 1200, due: '07/05', status: 'urgent' },
+    { desc: 'Internet Matriz', value: 150, due: '10/05', status: 'pending' }
+  ];
 
   const fetchData = async () => {
     try {
