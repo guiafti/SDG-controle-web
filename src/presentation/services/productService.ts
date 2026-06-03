@@ -112,10 +112,13 @@ export const productService = {
         .from('products')
         .getPublicUrl(fileName);
 
-      // Atualiza o produto com a nova URL da imagem
-      await supabase.from('products').update({ image_url: publicUrl }).eq('barcode', params.barcode);
+      // Atualiza o produto com a nova URL da imagem (mantendo compatibilidade com 'image' e 'image_url')
+      await supabase.from('products').update({ 
+        image: publicUrl,
+        image_url: publicUrl 
+      }).eq('barcode', params.barcode);
 
-      return { success: true, url: publicUrl };
+      return { success: true, url: publicUrl, fileName: publicUrl };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
@@ -155,7 +158,7 @@ export const productService = {
         .from('products')
         .getPublicUrl(fileName);
 
-      return { success: true, url: publicUrl };
+      return { success: true, url: publicUrl, fileName: publicUrl };
     } catch (err: any) {
       return { success: false, error: err.message };
     }

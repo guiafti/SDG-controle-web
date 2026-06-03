@@ -200,6 +200,8 @@ const Inventory: React.FC<InventoryProps> = ({ role }) => {
       if (formImage?.startsWith('data:image')) {
         const uploadResult = await productService.uploadImage({ barcode: formBarcode, base64Data: formImage });
         if (uploadResult.success) finalImageName = uploadResult.fileName;
+      } else if (formImage?.startsWith('http')) {
+        finalImageName = formImage;
       } else if (selectedIcon) {
         finalImageName = `icon:${selectedIcon}`;
       } else if (!formImage) {
@@ -505,7 +507,10 @@ const Inventory: React.FC<InventoryProps> = ({ role }) => {
                             <div className="relative group">
                                 <div className={`aspect-square rounded-2xl bg-slate-50 border-2 border-dashed flex items-center justify-center overflow-hidden transition-all group-hover:border-brand-300 relative ${selectedIcon ? 'border-brand-500 bg-brand-50/30' : 'border-slate-200'}`}>
                                     {formImage ? (
-                                        <img src={formImage.startsWith('data') ? formImage : `local-img://${formImage}`} className="w-full h-full object-cover" />
+                                        <img 
+                                          src={formImage.startsWith('data') || formImage.startsWith('http') ? formImage : `local-img://${formImage}`} 
+                                          className="w-full h-full object-cover" 
+                                        />
                                     ) : selectedIcon ? (
                                         <div className="flex flex-col items-center gap-2">
                                             <i className={`ph ${selectedIcon} text-6xl text-brand-500`}></i>

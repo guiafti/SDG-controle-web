@@ -78,14 +78,6 @@ function createWindow() {
     }
   });
 
-  // Aplica o zoom salvo se existir
-  get("SELECT value FROM settings WHERE key = 'app_zoom'").then(setting => {
-    if (setting && setting.value) {
-      const factor = parseFloat(setting.value);
-      if (!isNaN(factor)) win.webContents.setZoomFactor(factor);
-    }
-  }).catch(() => {});
-
   if (!app.isPackaged) {
     win.loadURL('http://127.0.0.1:5173');
     win.webContents.openDevTools();
@@ -179,6 +171,13 @@ ipcMain.handle('get-printers', async () => {
   } catch (e) { return []; }
 });
 
+ipcMain.handle('check-for-updates', async () => {
+  if (app.isPackaged) {
+    return await autoUpdater.checkForUpdatesAndNotify();
+  }
+  return { success: false, message: 'Not packaged' };
+});
+
 // --- IMPRESSÃO ---
 ipcMain.handle('print-usb', async (_, { vid, pid, data }) => await PrinterModule.printUSB(vid, pid, data));
 ipcMain.handle('test-printer', async () => await PrinterModule.printUSB(0x28E9, 0x0289, "TESTE DE IMPRESSAO\nOK!"));
@@ -246,4 +245,20 @@ ipcMain.handle('export-report-excel', async (event, data) => {
   return { success: true, filePath };
 });
 
-// --- ATUALIZAÇÕES ---
+// --- ATUALIZAÇÕES (EVENTOS) ---
+autoUpdater.on('update-available', () => {
+  const win = BrowserWindow.getAllWindows()[0];
+  if (win) win.webContents.send('update-available');
+});
+
+autoUpdater.on('update-downloaded', () => {
+  dialog.showMessageBox({
+    type: 'info',
+    title: 'Atualização Pronta',
+    message: 'Uma nova versão foi baixada. Deseja reiniciar para atualizar?',
+    buttons: ['Reiniciar Agora', 'Depois']
+  }).then((result) => {
+    if (result.response === 0) autoUpdater.quitAndInstall();
+  });
+});
+
