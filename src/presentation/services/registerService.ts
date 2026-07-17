@@ -16,16 +16,21 @@ export const registerService = {
       if (error) return null;
       if (!data) return null;
 
-      // Mapeia para o formato que o frontend espera
+      // Mapeia objeto híbrido com todas as propriedades possíveis para evitar erros de undefined
       return {
         id: data.id,
         store_id: data.store_id,
+        user_name: data.user_name,
         opened_by: data.user_name,
-        initial_value: data.opening_balance,
+        opening_balance: data.opening_balance || 0,
+        initial_value: data.opening_balance || 0,
         opened_at: data.opened_at,
         closed_by: data.user_name,
+        closing_balance: data.closing_balance || 0,
+        reported_balance: data.reported_balance || 0,
         final_value: data.reported_balance || data.closing_balance || 0,
         observations: data.notes,
+        notes: data.notes,
         closed_at: data.closed_at,
         status: data.status
       };
@@ -99,15 +104,21 @@ export const registerService = {
         .limit(50);
       if (error) throw error;
       
+      // Retorna objeto híbrido para compatibilidade total nas páginas e relatórios
       return (data || []).map(d => ({
         id: d.id,
         store_id: d.store_id,
+        user_name: d.user_name,
         opened_by: d.user_name,
-        initial_value: d.opening_balance,
+        opening_balance: d.opening_balance || 0,
+        initial_value: d.opening_balance || 0,
         opened_at: d.opened_at,
         closed_by: d.user_name,
+        closing_balance: d.closing_balance || 0,
+        reported_balance: d.reported_balance || 0,
         final_value: d.reported_balance || d.closing_balance || 0,
         observations: d.notes,
+        notes: d.notes,
         closed_at: d.closed_at,
         status: d.status
       }));
