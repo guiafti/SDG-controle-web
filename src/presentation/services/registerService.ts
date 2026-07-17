@@ -16,18 +16,20 @@ export const registerService = {
       if (error) return null;
       if (!data) return null;
 
+      // Mapeia objeto híbrido com todas as propriedades possíveis e garante conversão numérica
       return {
         id: data.id,
         store_id: data.store_id,
         user_name: data.user_name,
         opened_by: data.user_name,
-        opening_balance: data.opening_balance || 0,
-        initial_value: data.opening_balance || 0,
+        opening_balance: Number(data.opening_balance || 0),
+        initial_value: Number(data.opening_balance || 0),
         opened_at: data.opened_at,
         closed_by: data.user_name,
-        closing_balance: data.closing_balance || 0,
-        reported_balance: data.reported_balance || 0,
-        final_value: data.reported_balance || data.closing_balance || 0,
+        closing_balance: Number(data.closing_balance || 0),
+        reported_balance: Number(data.reported_balance || 0),
+        final_value: Number(data.reported_balance || data.closing_balance || 0),
+        total_sales: Number(data.closing_balance || 0), // Evita undefined no JSX
         observations: data.notes,
         notes: data.notes,
         closed_at: data.closed_at,
@@ -124,7 +126,6 @@ export const registerService = {
         employeesMap[vendedorName] = (employeesMap[vendedorName] || 0) + (s.total || 0);
 
         try {
-          // Se for string JSON, faz parse. Se for array direto, usa direto.
           const items = typeof s.items === 'string' ? JSON.parse(s.items) : s.items;
           if (Array.isArray(items)) {
             items.forEach((item: any) => {
@@ -173,18 +174,20 @@ export const registerService = {
         .limit(50);
       if (error) throw error;
       
+      // Retorna objeto híbrido para compatibilidade total nas páginas e relatórios
       return (data || []).map(d => ({
         id: d.id,
         store_id: d.store_id,
         user_name: d.user_name,
         opened_by: d.user_name,
-        opening_balance: d.opening_balance || 0,
-        initial_value: d.opening_balance || 0,
+        opening_balance: Number(d.opening_balance || 0),
+        initial_value: Number(d.opening_balance || 0),
         opened_at: d.opened_at,
         closed_by: d.user_name,
-        closing_balance: d.closing_balance || 0,
-        reported_balance: d.reported_balance || 0,
-        final_value: d.reported_balance || d.closing_balance || 0,
+        closing_balance: Number(d.closing_balance || 0),
+        reported_balance: Number(d.reported_balance || 0),
+        final_value: Number(d.reported_balance || d.closing_balance || 0),
+        total_sales: Number(d.closing_balance || 0), // Evita undefined no JSX do histórico de fechamento
         observations: d.notes,
         notes: d.notes,
         closed_at: d.closed_at,
