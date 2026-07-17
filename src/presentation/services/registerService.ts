@@ -16,7 +16,6 @@ export const registerService = {
       if (error) return null;
       if (!data) return null;
 
-      // Mapeia objeto híbrido com todas as propriedades possíveis para evitar erros de undefined
       return {
         id: data.id,
         store_id: data.store_id,
@@ -71,26 +70,96 @@ export const registerService = {
   },
 
   async getData(params: { storeId: string; openedAt: string }) {
-    if (!supabase) return { sales: [], expenses: [] };
+    if (!supabase) return { totals: { sales: 0, cash: 0, card: 0, pix: 0, expenses: 0, discounts: 0 }, topProducts: [], salesByEmployee: [] };
     
-    // Busca vendas realizadas no caixa atual
-    const { data: sales } = await supabase
-      .from('sales')
-      .select('*')
-      .eq('store_id', params.storeId)
-      .gte('created_at', params.openedAt);
+    try {
+      // 1. Busca vendas realizadas desde opened_at
+      const { data: sales } = await supabase
+        .from('sales')
+        .select('*')
+        .eq('store_id', params.storeId)
+        .gte('created_at', params.openedAt);
 
-    // Busca retiradas/despesas registradas
-    const { data: expenses } = await supabase
-      .from('expenses')
-      .select('*')
-      .eq('store_id', params.storeId)
-      .gte('date', params.openedAt);
+      // 2. Busca despesas
+      const { data: expenses } = await supabase
+        .from('expenses')
+        .select('*')
+        .eq('store_id', params.storeId)
+        .gte('created_at', params.openedAt);
 
-    return { 
-      sales: sales || [], 
-      expenses: expenses || [] 
-    };
+      // 3. Busca sangrias
+      const { data: sangrias } = await supabase
+        .from('financial_transactions')
+        .select('*')
+        .eq('store_id', params.storeId)
+        .eq('category', 'SANGRIA')
+        .gte('created_at', params.openedAt);
+
+      // 4. Calcula Totais
+      const totalSales = (sales || []).reduce((acc, s) => acc + (s.total || 0), 0);
+      const cashSales = (sales || []).filter(s => s.payment_method === 'DINHEIRO').reduce((acc, s) => acc + (s.total || 0), 0);
+      const cardSales = (sales || []).filter(s => ['CREDITO', 'DEBITO', 'CARTAO'].includes(s.payment_method)).reduce((acc, s) => acc + (s.total || 0), 0);
+      const pixSales = (sales || []).filter(s => s.payment_method === 'PIX').reduce((acc, s) => acc + (s.total || 0), 0);
+      
+      const totalExpenses = ((expenses || []).reduce((acc, e) => acc + (e.value || 0), 0)) + 
+                            ((sangrias || []).reduce((acc, sg) => acc + (sg.amount || 0), 0));
+
+      const totalDiscounts = (sales || []).reduce((acc, s) => acc + (s.discount || 0), 0);
+
+      const totals = {
+        sales: totalSales,
+        cash: cashSales,
+        card: cardSales,
+        pix: pixSales,
+        expenses: totalExpenses,
+        discounts: totalDiscounts
+      };
+
+      // 5. Agrupa produtos vendidos
+      const productsMap: Record<string, { nome: string, qtd: number }> = {};
+      const employeesMap: Record<string, number> = {};
+
+      (sales || []).forEach(s => {
+        const vendedorName = s.vendedor || 'Desconhecido';
+        employeesMap[vendedorName] = (employeesMap[vendedorName] || 0) + (s.total || 0);
+
+        try {
+          // Se for string JSON, faz parse. Se for array direto, usa direto.
+          const items = typeof s.items === 'string' ? JSON.parse(s.items) : s.items;
+          if (Array.isArray(items)) {
+            items.forEach((item: any) => {
+              const name = item.nome || item.name || 'Produto';
+              const id = item.id || name;
+              if (!productsMap[id]) {
+                productsMap[id] = { nome: name, qtd: 0 };
+              }
+              productsMap[id].qtd += (item.qtd || item.quantity || 0);
+            });
+          }
+        } catch (e) {
+          console.error('[WEB GETDATA] Erro parse items:', e);
+        }
+      });
+
+      const topProducts = Object.values(productsMap)
+        .sort((a, b) => b.qtd - a.qtd)
+        .slice(0, 5);
+
+      const salesByEmployee = Object.entries(employeesMap).map(([name, total]) => ({ name, total }));
+
+      return {
+        totals,
+        topProducts,
+        salesByEmployee
+      };
+    } catch (err) {
+      console.error('[WEB GETDATA ERROR]', err);
+      return {
+        totals: { sales: 0, cash: 0, card: 0, pix: 0, expenses: 0, discounts: 0 },
+        topProducts: [],
+        salesByEmployee: []
+      };
+    }
   },
 
   async getHistory() {
@@ -104,7 +173,6 @@ export const registerService = {
         .limit(50);
       if (error) throw error;
       
-      // Retorna objeto híbrido para compatibilidade total nas páginas e relatórios
       return (data || []).map(d => ({
         id: d.id,
         store_id: d.store_id,

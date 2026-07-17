@@ -301,15 +301,22 @@ const App: React.FC = () => {
       if (result.success) {
         toast.success('VENDA CONCLUÍDA!', { id: loadingId });
         
-        // Impressão Direta usando o Hook
-        await printSale({ ...saleData, id: result.saleId, created_at: new Date().toISOString() }, loja, logoApp);
-
-        // Limpar carrinho
+        // Limpar carrinho e fechar estado
         setCarrinho([]);
         setDesconto(0);
+
+        // Impressão Direta usando o Hook (encapsulado para não travar a tela se falhar)
+        try {
+          await printSale({ ...saleData, id: result.saleId || saleData.id, created_at: new Date().toISOString() }, loja, logoApp);
+        } catch (printErr) {
+          console.warn('Erro ao processar impressão na Web:', printErr);
+        }
+      } else {
+        toast.error(`Erro ao salvar venda: ${result.error || 'Erro desconhecido'}`, { id: loadingId });
       }
-    } catch (error) { 
-      toast.error('Erro ao salvar venda!', { id: loadingId }); 
+    } catch (error: any) { 
+      console.error('Erro na finalização da venda:', error);
+      toast.error(`Falha na comunicação: ${error.message || 'Erro desconhecido'}`, { id: loadingId }); 
     }
   };
 
