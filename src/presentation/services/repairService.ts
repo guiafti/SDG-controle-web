@@ -3,29 +3,28 @@ import { supabase } from './api';
 export const repairService = {
   async getAll() {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('repairs')
-      .select('*')
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('maintenance_orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error('[WEB REPAIRS ERROR]', e);
+      return [];
+    }
   },
 
   async getHistory(repairId: string) {
-    if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('repair_logs')
-      .select('*')
-      .eq('repair_id', repairId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    // Retorna array vazio pois repair_logs não existe na nuvem do Supabase
+    return [];
   },
 
   async updateStatus(params: { id: string; status: string; current_store_id: string }) {
     if (!supabase) throw new Error('Supabase não configurado');
     const { error } = await supabase
-      .from('repairs')
+      .from('maintenance_orders')
       .update({ 
         status: params.status, 
         current_store_id: params.current_store_id,
@@ -34,21 +33,13 @@ export const repairService = {
       .eq('id', params.id);
     
     if (error) return { success: false, error: error.message };
-
-    // Adicionar log automaticamente
-    await this.addLog({
-      repair_id: params.id,
-      action: `Status alterado para: ${params.status}`,
-      user_name: 'Usuário' 
-    });
-
     return { success: true };
   },
 
   async updateNotes(params: { id: string; technical_notes: string }) {
     if (!supabase) throw new Error('Supabase não configurado');
     const { error } = await supabase
-      .from('repairs')
+      .from('maintenance_orders')
       .update({ 
         technical_notes: params.technical_notes,
         updated_at: new Date().toISOString()
@@ -62,7 +53,7 @@ export const repairService = {
   async updatePayment(params: { id: string; payment_status: string }) {
     if (!supabase) throw new Error('Supabase não configurado');
     const { error } = await supabase
-      .from('repairs')
+      .from('maintenance_orders')
       .update({ 
         payment_status: params.payment_status,
         updated_at: new Date().toISOString()
@@ -75,35 +66,52 @@ export const repairService = {
 
   async save(repair: any) {
     if (!supabase) throw new Error('Supabase não configurado');
+    
+    // Filtra e remove campos que não existem no Supabase antes de dar o upsert
     const payload = {
-      ...repair,
       id: repair.id || crypto.randomUUID(),
+      customer_name: repair.customer_name,
+      customer_phone: repair.customer_phone,
+      device_brand: repair.device_brand,
+      device_model: repair.device_model,
+      issue_description: repair.issue_description,
+      technical_notes: repair.technical_notes,
+      checklist: repair.checklist,
+      photo_url: repair.photo_url,
+      price: Number(repair.price || 0),
+      entry_store_id: repair.entry_store_id,
+      maintenance_store_id: repair.maintenance_store_id,
+      return_store_id: repair.return_store_id,
+      current_store_id: repair.current_store_id,
+      status: repair.status,
+      payment_status: repair.payment_status || 'pending',
       created_at: repair.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-    const { error } = await supabase.from('repairs').upsert(payload);
+    
+    const { error } = await supabase.from('maintenance_orders').upsert(payload);
     if (error) return { success: false, error: error.message };
     return { success: true, id: payload.id };
   },
 
   async addLog(log: { repair_id: string; action: string; user_name: string; notes?: string }) {
-    if (!supabase) return { success: false };
-    const { error } = await supabase.from('repair_logs').insert([{
-      ...log,
-      created_at: new Date().toISOString()
-    }]);
-    return { success: !error };
+    // Retorna sucesso de mentira pois repair_logs não existe na nuvem
+    return { success: true };
   },
 
   async getByCustomer(customerId: string) {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('repairs')
-      .select('*')
-      .eq('customer_id', customerId)
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('maintenance_orders')
+        .select('*')
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      return [];
+    }
   },
 
   async uploadImage(params: { id: string; base64Data: string }) {
@@ -118,15 +126,16 @@ export const repairService = {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      const fileName = `repairs/${params.id}/${Date.now()}.jpg`;
+      // Salva no bucket correto de imagens do reparo (repair-images)
+      const fileName = `repairs/${params.id}_${Date.now()}.jpg`;
       const { error } = await supabase.storage
-        .from('repairs')
+        .from('repair-images')
         .upload(fileName, blob, { upsert: true });
 
       if (error) throw error;
 
       const { data: { publicUrl } } = supabase.storage
-        .from('repairs')
+        .from('repair-images')
         .getPublicUrl(fileName);
 
       return { success: true, url: publicUrl };

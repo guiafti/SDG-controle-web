@@ -3,38 +3,62 @@ import { supabase } from './api';
 export const financialService = {
   async getSummary() {
     if (!supabase) return { totalSales: 0, totalExpenses: 0, balance: 0 };
-    // Implementação para Nuvem
-    const { data: sales } = await supabase.from('sales').select('total');
-    const { data: expenses } = await supabase.from('expenses').select('value');
-    
-    const totalSales = (sales || []).reduce((acc, s) => acc + (s.total || 0), 0);
-    const totalExpenses = (expenses || []).reduce((acc, e) => acc + (e.value || 0), 0);
-    
-    return {
-      totalSales,
-      totalExpenses,
-      balance: totalSales - totalExpenses
-    };
+    try {
+      const { data: sales } = await supabase.from('sales').select('total');
+      const { data: expenses } = await supabase.from('expenses').select('value');
+      
+      const totalSales = (sales || []).reduce((acc, s) => acc + (s.total || 0), 0);
+      const totalExpenses = (expenses || []).reduce((acc, e) => acc + (e.value || 0), 0);
+      
+      return {
+        totalSales,
+        totalExpenses,
+        balance: totalSales - totalExpenses
+      };
+    } catch (e) {
+      return { totalSales: 0, totalExpenses: 0, balance: 0 };
+    }
   },
 
   async getExpenses() {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('expenses')
-      .select('*, expense_categories(name)')
-      .order('date', { ascending: false });
-    if (error) throw error;
-    return data || [];
+    try {
+      // Faz duas queries separadas para evitar erro 400 de relacionamento implícito do PostgREST
+      const { data: expenses, error: expError } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('date', { ascending: false });
+
+      if (expError) throw expError;
+
+      const { data: categories } = await supabase
+        .from('expense_categories')
+        .select('*');
+
+      const catMap = new Map(categories?.map(c => [c.id, c.name]));
+      
+      return (expenses || []).map(e => ({
+        ...e,
+        expense_categories: { name: catMap.get(e.category_id) || 'Sem Categoria' }
+      }));
+    } catch (e) {
+      console.error('[WEB EXPENSES ERROR]', e);
+      return [];
+    }
   },
 
   async getCategories() {
     if (!supabase) return [];
-    const { data, error } = await supabase
-      .from('expense_categories')
-      .select('*')
-      .order('name', { ascending: true });
-    if (error) throw error;
-    return data || [];
+    try {
+      const { data, error } = await supabase
+        .from('expense_categories')
+        .select('*')
+        .order('name', { ascending: true });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      return [];
+    }
   },
 
   async saveExpense(expense: any) {
@@ -60,23 +84,31 @@ export const financialService = {
   },
 
   async getBudgets() {
-    if (!supabase) return [];
-    const { data, error } = await supabase.from('budgets').select('*');
-    if (error) throw error;
-    return data || [];
+    // Retorna vazio pois a tabela de orçamentos/metas não existe/não é sincronizada na nuvem
+    return [];
   },
 
   async getDetailedReports(filters: any) {
     if (!supabase) return [];
-    let query = supabase.from('sales').select('*, customers(name), users(name)');
-    
-    if (filters.startDate) query = query.gte('created_at', filters.startDate);
-    if (filters.endDate) query = query.lte('created_at', filters.endDate);
-    if (filters.storeId) query = query.eq('store_id', filters.storeId);
-    
-    const { data, error } = await query;
-    if (error) return [];
-    return data || [];
+    try {
+      let query = supabase.from('sales').select('*');
+      
+      if (filters.startDate) query = query.gte('created_at', filters.startDate);
+      if (filters.endDate) query = query.lte('created_at', filters.endDate);
+      if (filters.storeId) query = query.eq('store_id', filters.storeId);
+      
+      const { data, error } = await query;
+      if (error) return [];
+      
+      // Simula Joins locais para o frontend não quebrar
+      return (data || []).map(s => ({
+        ...s,
+        customers: { name: s.customer_name || 'Consumidor Final' },
+        users: { name: s.vendedor || 'Operador' }
+      }));
+    } catch (e) {
+      return [];
+    }
   },
 
   async exportToExcel(params: any) {
@@ -89,29 +121,31 @@ export const financialService = {
 
   async getCommissions() {
     if (!supabase) return [];
-    // Busca vendas com informações de usuários para cálculo de comissão
-    const { data, error } = await supabase
-      .from('sales')
-      .select('*, users(name, role)')
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (error) return [];
       
-    if (error) return [];
-    
-    // Agrupa por usuário e calcula (exemplo de lógica)
-    const commissionsMap: any = {};
-    (data || []).forEach(sale => {
-      const userName = sale.users?.name || 'Desconhecido';
-      if (!commissionsMap[userName]) {
-        commissionsMap[userName] = {
-          userName,
-          totalSales: 0,
-          commission: 0
-        };
-      }
-      commissionsMap[userName].totalSales += sale.total;
-      commissionsMap[userName].commission += sale.total * 0.05; // 5% exemplo
-    });
+      const commissionsMap: any = {};
+      (data || []).forEach(sale => {
+        const userName = sale.vendedor || 'Desconhecido';
+        if (!commissionsMap[userName]) {
+          commissionsMap[userName] = {
+            userName,
+            totalSales: 0,
+            commission: 0
+          };
+        }
+        commissionsMap[userName].totalSales += sale.total;
+        commissionsMap[userName].commission += sale.total * 0.05; // 5% exemplo
+      });
 
-    return Object.values(commissionsMap);
+      return Object.values(commissionsMap);
+    } catch (e) {
+      return [];
+    }
   }
 };

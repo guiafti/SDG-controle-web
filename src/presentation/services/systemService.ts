@@ -1,31 +1,34 @@
-import { isElectron, supabase } from './api';
+import { supabase } from './api';
+
+// Detecção de ambiente para recursos de hardware/SO
+export const isElectron = typeof window !== 'undefined' && (window as any).api !== undefined;
 
 export const systemService = {
-  async getAppTitle() {
-    if (isElectron) return await window.api.getAppTitle();
-    return 'SDG Controle (Cloud)';
-  },
-
-  async isCloudConfigured() {
-    return !!supabase;
-  },
-
-  async getDashboardStats() {
+  async getDashboardSummary(storeId: string) {
     if (!supabase) return { totalRevenue: 0, monthlyRevenue: 0, activeOrders: 0, lowStockItems: 0 };
-    
     try {
-      const { data: sales } = await supabase.from('sales').select('total');
-      const { count: activeOrders } = await supabase.from('maintenance_orders')
-        .select('*', { count: 'exact', head: true })
-        .not('status', 'eq', 'Entregue ao Cliente');
-      
-      const { count: lowStock } = await supabase.from('inventory')
-        .select('*', { count: 'exact', head: true }); 
-      // Nota: Filtragem de lowStock complexa movida para o backend ou feita via query se as colunas permitirem.
-      // Por simplicidade, faremos a soma das vendas.
-      
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString();
+
+      // Vendas
+      const { data: sales } = await supabase
+        .from('sales')
+        .select('total')
+        .eq('store_id', storeId)
+        .gte('created_at', todayISO);
+
       const total = (sales || []).reduce((acc, s) => acc + (s.total || 0), 0);
-      
+
+      // Ordens ativas
+      const { count: activeOrders } = await supabase
+        .from('maintenance_orders')
+        .select('id', { count: 'exact', head: true })
+        .eq('status', 'Pendente');
+
+      // Itens com baixo estoque
+      const lowStock = await this.getLowStockItemsCount();
+
       return {
         totalRevenue: total,
         monthlyRevenue: total,
@@ -37,18 +40,36 @@ export const systemService = {
     }
   },
 
+  async getLowStockItemsCount() {
+    if (!supabase) return 0;
+    try {
+      const { data } = await supabase.from('inventory').select('quantity, min_stock');
+      return (data || []).filter(i => i.quantity <= i.min_stock).length;
+    } catch (e) {
+      return 0;
+    }
+  },
+
   async getLowStockItems() {
     if (!supabase) return [];
     try {
-        // Busca produtos onde a quantidade é menor ou igual ao estoque mínimo
-        // Como o Supabase não permite comparar duas colunas na mesma linha facilmente sem RPC,
-        // vamos buscar o inventário e filtrar no JS (ou usar uma view no futuro)
-        const { data } = await supabase.from('inventory').select('*, products(name)');
-        return (data || [])
-            .filter(i => i.quantity <= i.min_stock)
-            .map(i => ({ name: i.products?.name, quantity: i.quantity, min_stock: i.min_stock }))
-            .slice(0, 10);
-    } catch (e) { return []; }
+      // Busca inventário e produtos separadamente para evitar erro 400 de relacionamento
+      const { data: inv } = await supabase.from('inventory').select('*');
+      const { data: prods } = await supabase.from('products').select('id, name');
+
+      const prodMap = new Map((prods || []).map(p => [p.id, p.name]));
+
+      return (inv || [])
+        .filter(i => i.quantity <= i.min_stock)
+        .map(i => ({ 
+          name: prodMap.get(i.product_id) || 'Produto Desconhecido', 
+          quantity: i.quantity, 
+          min_stock: i.min_stock 
+        }))
+        .slice(0, 10);
+    } catch (e) { 
+      return []; 
+    }
   },
 
   async getSyncStatus() {
@@ -57,39 +78,14 @@ export const systemService = {
 
   // Window management
   minimize() {
-    if (isElectron) window.api.minimizeWindow();
+    if (isElectron) (window as any).api.minimizeWindow();
   },
 
   maximize() {
-    if (isElectron) window.api.maximizeWindow();
+    if (isElectron) (window as any).api.maximizeWindow();
   },
 
   close() {
-    if (isElectron) window.api.closeWindow();
+    if (isElectron) (window as any).api.closeWindow();
   },
-
-  setZoom(level: number) {
-    if (isElectron) window.api.setZoom(level);
-  },
-
-  // Updates (Electron only)
-  onUpdateAvailable(callback: (info: any) => void) {
-    if (isElectron) return window.api.onUpdateAvailable(callback);
-    return () => {};
-  },
-
-  onUpdateProgress(callback: (progress: any) => void) {
-    if (isElectron) return window.api.onUpdateProgress(callback);
-    return () => {};
-  },
-
-  onUpdateDownloaded(callback: (info: any) => void) {
-    if (isElectron) return window.api.onUpdateDownloaded(callback);
-    return () => {};
-  },
-
-  async checkForUpdates() {
-    if (isElectron) return await window.api.checkForUpdates();
-    return { success: false, error: 'Atualizações automáticas disponíveis apenas no Desktop' };
-  }
 };
