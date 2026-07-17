@@ -2,28 +2,116 @@ import { supabase } from './api';
 
 export const financialService = {
   async getSummary() {
-    if (!supabase) return { totalSales: 0, totalExpenses: 0, balance: 0 };
+    if (!supabase) return { totalInflow: 0, totalOutflow: 0, netProfit: 0, estimatedCost: 0, trends: [], ledger: [] };
+    
     try {
-      const { data: sales } = await supabase.from('sales').select('total');
-      const { data: expenses } = await supabase.from('expenses').select('value');
+      // 1. Inflows
+      const { data: inflows } = await supabase
+        .from('financial_transactions')
+        .select('amount, date')
+        .eq('type', 'INFLOW');
+
+      // 2. Outflows
+      const { data: outflows } = await supabase
+        .from('financial_transactions')
+        .select('amount')
+        .eq('type', 'OUTFLOW');
+
+      // 3. Sales Inflows
+      const { data: salesInflows } = await supabase
+        .from('financial_transactions')
+        .select('amount')
+        .eq('type', 'INFLOW')
+        .eq('category', 'VENDA');
+
+      // 4. Repairs Inflows
+      const { data: repairsInflows } = await supabase
+        .from('financial_transactions')
+        .select('amount')
+        .eq('type', 'INFLOW')
+        .eq('category', 'MANUTENÇÃO');
+
+      // 5. Ledger (Livro-caixa com limite de 100 itens)
+      const { data: ledger } = await supabase
+        .from('financial_transactions')
+        .select('*')
+        .order('date', { ascending: false })
+        .limit(100);
+
+      const totalInflow = (inflows || []).reduce((acc, t) => acc + (t.amount || 0), 0);
+      const totalOutflow = (outflows || []).reduce((acc, t) => acc + (t.amount || 0), 0);
+      const salesInflow = (salesInflows || []).reduce((acc, t) => acc + (t.amount || 0), 0);
+      const repairsInflow = (repairsInflows || []).reduce((acc, t) => acc + (t.amount || 0), 0);
+
+      // Busca as vendas para calcular o custo estimado
+      const { data: sales } = await supabase.from('sales').select('items');
+      let estimatedCost = 0;
+      (sales || []).forEach(sale => {
+        if (sale.items) {
+          try {
+            const items = typeof sale.items === 'string' ? JSON.parse(sale.items) : sale.items;
+            if (Array.isArray(items)) {
+              items.forEach((item: any) => {
+                const qty = Number(item.qtd || item.quantity || 0);
+                const cost = Number(item.cost_price || item.custo || 0);
+                estimatedCost += cost * qty;
+              });
+            }
+          } catch(e) {}
+        }
+      });
+
+      // Simula trends dos últimos 6 meses
+      const MONTH_NAMES = [
+        'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+        'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+      ];
       
-      const totalSales = (sales || []).reduce((acc, s) => acc + (s.total || 0), 0);
-      const totalExpenses = (expenses || []).reduce((acc, e) => acc + (e.value || 0), 0);
-      
+      const monthlyTotals: Record<number, number> = {};
+      (inflows || []).forEach((t: any) => {
+        if (t.date) {
+          try {
+            const dateObj = new Date(t.date);
+            const month = dateObj.getMonth();
+            monthlyTotals[month] = (monthlyTotals[month] || 0) + (t.amount || 0);
+          } catch (e) {}
+        }
+      });
+
+      const trends = Object.entries(monthlyTotals).map(([m, val]) => ({
+        month: MONTH_NAMES[Number(m)] || `Mês ${m}`,
+        inflow: val
+      })).slice(-6);
+
       return {
-        totalSales,
-        totalExpenses,
-        balance: totalSales - totalExpenses
+        totalInflow,
+        totalOutflow,
+        salesInflow,
+        repairsInflow,
+        estimatedCost,
+        netProfit: totalInflow - totalOutflow,
+        ledger: (ledger || []).map(l => ({ 
+          id: l.id,
+          date: l.date,
+          description: l.description,
+          type: l.category, // category mapeia para type
+          value: l.amount, // amount mapeia para value
+          payment_method: l.payment_method,
+          trans_type: l.type, // type mapeia para trans_type
+          reference_id: l.reference_id,
+          store_id: l.store_id
+        })),
+        trends: trends.length > 0 ? trends : [{ month: MONTH_NAMES[new Date().getMonth()], inflow: 0 }]
       };
     } catch (e) {
-      return { totalSales: 0, totalExpenses: 0, balance: 0 };
+      console.error('[WEB GETSUMMARY ERROR]', e);
+      return { totalInflow: 0, totalOutflow: 0, netProfit: 0, estimatedCost: 0, trends: [], ledger: [] };
     }
   },
 
   async getExpenses() {
     if (!supabase) return [];
     try {
-      // Faz duas queries separadas para evitar erro 400 de relacionamento implícito do PostgREST
       const { data: expenses, error: expError } = await supabase
         .from('expenses')
         .select('*')
@@ -84,7 +172,6 @@ export const financialService = {
   },
 
   async getBudgets() {
-    // Retorna vazio pois a tabela de orçamentos/metas não existe/não é sincronizada na nuvem
     return [];
   },
 
@@ -100,7 +187,6 @@ export const financialService = {
       const { data, error } = await query;
       if (error) return [];
       
-      // Simula Joins locais para o frontend não quebrar
       return (data || []).map(s => ({
         ...s,
         customers: { name: s.customer_name || 'Consumidor Final' },

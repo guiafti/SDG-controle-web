@@ -6,10 +6,15 @@ export const saleService = {
     
     const newSaleId = saleData.id || crypto.randomUUID();
     
-    // Converte items para string JSON se for um objeto/array (garante que caiba no campo TEXT do banco)
+    // Remove colunas que não existem no Supabase na nuvem (como customer_id e synced)
+    // para evitar erros de restrição no schema.
     const payload = {
-      ...saleData,
       id: newSaleId,
+      store_id: saleData.store_id,
+      vendedor: saleData.vendedor,
+      total: saleData.total,
+      discount: saleData.discount,
+      payment_method: saleData.payment_method,
       items: typeof saleData.items === 'string' ? saleData.items : JSON.stringify(saleData.items),
       created_at: new Date().toISOString()
     };
