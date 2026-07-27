@@ -5,40 +5,87 @@ export const financialService = {
     if (!supabase) return { totalInflow: 0, totalOutflow: 0, netProfit: 0, estimatedCost: 0, trends: [], ledger: [] };
     
     try {
-      // 1. Inflows (RECEITA_VENDA, RECEITA_MANUTENCAO, ENTRADA_SUPRIMENTO, INFLOW)
-      const { data: inflows } = await supabase
+      // 1. Busca todas as transações financeiras
+      const { data: inflowsData } = await supabase
         .from('financial_transactions')
-        .select('*')
-        .in('type', ['RECEITA_VENDA', 'RECEITA_MANUTENCAO', 'ENTRADA_SUPRIMENTO', 'INFLOW']);
+        .select('*');
 
-      // 2. Outflows (SAIDA_SANGRIA, DESPESA, OUTFLOW)
-      const { data: outflows } = await supabase
-        .from('financial_transactions')
-        .select('*')
-        .in('type', ['SAIDA_SANGRIA', 'DESPESA', 'OUTFLOW']);
+      const allFinTrans = inflowsData || [];
 
-      // 3. Ledger (Livro-caixa unificado)
-      const { data: ledger } = await supabase
-        .from('financial_transactions')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(100);
+      const inflows = allFinTrans.filter(t => 
+        ['RECEITA_VENDA', 'RECEITA_MANUTENCAO', 'ENTRADA_SUPRIMENTO', 'INFLOW', 'RECEITA'].includes(String(t.type || t.category).toUpperCase())
+      );
 
-      const totalInflow = (inflows || []).reduce((acc, t) => acc + Number(t.amount || 0), 0);
-      const totalOutflow = (outflows || []).reduce((acc, t) => acc + Number(t.amount || 0), 0);
+      const outflows = allFinTrans.filter(t => 
+        ['SAIDA_SANGRIA', 'DESPESA', 'OUTFLOW', 'SANGRIA', 'SAIDA'].includes(String(t.type || t.category).toUpperCase())
+      );
+
+      // 2. Busca também vendas diretamente da tabela sales
+      const { data: salesData } = await supabase
+        .from('sales')
+        .select('*');
+
+      const allSales = (salesData || []).filter(s => String(s.status).toUpperCase() !== 'CANCELADA');
+      const totalSalesFromSales = allSales.reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
+
+      // Total de Inflow de vendas (maior valor entre financial_transactions e vendas reais)
+      let ftSalesInflow = inflows
+        .filter(t => ['RECEITA_VENDA', 'VENDA'].includes(String(t.type || t.category).toUpperCase()))
+        .reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
+      const salesInflow = Math.max(ftSalesInflow, totalSalesFromSales);
       
-      const salesInflow = (inflows || [])
-        .filter(t => t.type === 'RECEITA_VENDA' || t.category === 'VENDA')
+      const repairsInflow = inflows
+        .filter(t => ['RECEITA_MANUTENCAO', 'MANUTENÇÃO', 'MANUTENCAO'].includes(String(t.type || t.category).toUpperCase()))
         .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
-      const repairsInflow = (inflows || [])
-        .filter(t => t.type === 'RECEITA_MANUTENCAO' || t.category === 'MANUTENÇÃO')
+      const suprimentosInflow = inflows
+        .filter(t => ['ENTRADA_SUPRIMENTO', 'SUPRIMENTO'].includes(String(t.type || t.category).toUpperCase()))
         .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
-      // Busca vendas para calcular custo estimado de produto
-      const { data: sales } = await supabase.from('sales').select('items').eq('status', 'CONCLUIDA');
+      const totalInflow = salesInflow + repairsInflow + suprimentosInflow;
+      const totalOutflow = outflows.reduce((acc, t) => acc + Number(t.amount || 0), 0);
+
+      // Ledger: unifica transações financeiras e vendas em tempo real
+      let ledgerMap = new Map();
+
+      allFinTrans.forEach(t => {
+        ledgerMap.set(t.id, {
+          id: t.id,
+          date: t.created_at || t.date,
+          description: t.description || 'Movimentação',
+          type: t.type || t.category || 'ENTRADA',
+          value: Number(t.amount || 0),
+          payment_method: t.payment_method || 'DINHEIRO',
+          trans_type: t.type,
+          reference_id: t.reference_id,
+          store_id: t.store_id
+        });
+      });
+
+      allSales.forEach(s => {
+        if (![...ledgerMap.values()].some(l => l.reference_id === s.id)) {
+          ledgerMap.set(s.id, {
+            id: s.id,
+            date: s.created_at,
+            description: `Venda #${String(s.id).substring(0, 8).toUpperCase()} - ${s.seller_name || s.vendedor || 'PDV'}`,
+            type: 'RECEITA_VENDA',
+            value: Number(s.total_amount ?? s.total ?? 0),
+            payment_method: s.payment_method || 'DINHEIRO',
+            trans_type: 'RECEITA_VENDA',
+            reference_id: s.id,
+            store_id: s.store_id
+          });
+        }
+      });
+
+      const ledger = [...ledgerMap.values()].sort((a, b) => 
+        new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime()
+      ).slice(0, 100);
+
+      // Custo estimado de mercadorias
       let estimatedCost = 0;
-      (sales || []).forEach(sale => {
+      allSales.forEach(sale => {
         if (sale.items) {
           try {
             const items = typeof sale.items === 'string' ? JSON.parse(sale.items) : sale.items;
@@ -59,13 +106,13 @@ export const financialService = {
       ];
       
       const monthlyTotals: Record<number, number> = {};
-      (inflows || []).forEach((t: any) => {
-        const dt = t.created_at || t.date;
+      allSales.forEach((s: any) => {
+        const dt = s.created_at;
         if (dt) {
           try {
             const dateObj = new Date(dt);
             const month = dateObj.getMonth();
-            monthlyTotals[month] = (monthlyTotals[month] || 0) + Number(t.amount || 0);
+            monthlyTotals[month] = (monthlyTotals[month] || 0) + Number(s.total_amount ?? s.total ?? 0);
           } catch (e) {}
         }
       });
@@ -82,22 +129,12 @@ export const financialService = {
         repairsInflow,
         estimatedCost,
         netProfit: totalInflow - totalOutflow,
-        ledger: (ledger || []).map(l => ({ 
-          id: l.id,
-          date: l.created_at || l.date,
-          description: l.description,
-          type: l.type || l.category,
-          value: Number(l.amount || 0),
-          payment_method: l.payment_method,
-          trans_type: l.type,
-          reference_id: l.reference_id,
-          store_id: l.store_id
-        })),
-        trends: trends.length > 0 ? trends : [{ month: MONTH_NAMES[new Date().getMonth()], inflow: 0 }]
+        ledger,
+        trends: trends.length > 0 ? trends : [{ month: MONTH_NAMES[new Date().getMonth()], inflow: salesInflow }]
       };
     } catch (e) {
       console.error('[GETSUMMARY ERROR]', e);
-      return { totalInflow: 0, totalOutflow: 0, netProfit: 0, estimatedCost: 0, trends: [], ledger: [] };
+      return { totalInflow: 0, totalOutflow: 0, salesInflow: 0, repairsInflow: 0, netProfit: 0, estimatedCost: 0, trends: [], ledger: [] };
     }
   },
 

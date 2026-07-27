@@ -21,8 +21,6 @@ export const saleService = {
       total: totalAmount,
       discount: discount,
       payment_method: paymentMethod,
-      customer_id: saleData.customer_id || null,
-      seller_name: sellerName,
       vendedor: sellerName,
       store_id: saleData.store_id || null,
       status: 'CONCLUIDA',

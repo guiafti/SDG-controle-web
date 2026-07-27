@@ -9,18 +9,18 @@ export const registerService = {
         .select('*');
       
       if (params.storeId) {
-        query = query.eq('store_id', params.storeId);
+        query = query.or(`store_id.eq.${params.storeId},store_id.is.null`);
       }
 
       const { data, error } = await query
-        .in('status', ['ABERTO', 'open'])
+        .in('status', ['ABERTO', 'open', 'aberto', 'OPEN'])
         .order('opened_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
       if (error || !data) return null;
 
-      const initialAmount = Number(data.initial_amount ?? data.opening_balance ?? 0);
+      const initialAmount = Number(data.initial_amount ?? data.opening_balance ?? data.initial_value ?? 0);
       const finalAmount = Number(data.final_cash_amount ?? data.reported_balance ?? data.closing_balance ?? 0);
 
       return {
@@ -32,50 +32,75 @@ export const registerService = {
         initial_amount: initialAmount,
         opening_balance: initialAmount,
         initial_value: initialAmount,
-        opened_at: data.opened_at,
-        closed_by: data.operator || data.user_name,
+        opened_at: data.opened_at || new Date().toISOString(),
+        closed_by: data.closed_by || data.operator || data.user_name,
         final_cash_amount: finalAmount,
         closing_balance: finalAmount,
         reported_balance: finalAmount,
         final_value: finalAmount,
         expected_cash_amount: Number(data.expected_cash_amount ?? 0),
         difference: Number(data.difference ?? 0),
-        total_sales: Number(data.closing_balance || 0),
-        observations: data.notes || data.observations,
-        notes: data.notes || data.observations,
+        total_sales: Number(data.closing_balance || data.total_sales || 0),
+        observations: data.notes || data.observations || '',
+        notes: data.notes || data.observations || '',
         closed_at: data.closed_at,
         status: data.status
       };
     } catch (e) {
+      console.error('[REGISTER SERVICE] Erro ao obter caixa atual:', e);
       return null;
     }
   },
 
   async open(params: { storeId: string; openedBy: string; initialValue: number }) {
     if (!supabase) throw new Error('Supabase não configurado');
-    const payload = {
-      id: crypto.randomUUID(),
-      store_id: params.storeId,
-      operator: params.openedBy,
-      user_name: params.openedBy,
-      initial_amount: Number(params.initialValue || 0),
-      opening_balance: Number(params.initialValue || 0),
+    const id = crypto.randomUUID();
+    const openedAt = new Date().toISOString();
+    const initialAmount = Number(params.initialValue || 0);
+
+    const fullPayload = {
+      id,
+      store_id: params.storeId || null,
+      operator: params.openedBy || 'Operador',
+      user_name: params.openedBy || 'Operador',
+      opened_by: params.openedBy || 'Operador',
+      initial_amount: initialAmount,
+      opening_balance: initialAmount,
+      initial_value: initialAmount,
       status: 'ABERTO',
-      opened_at: new Date().toISOString()
+      opened_at: openedAt
     };
 
-    const { error } = await supabase.from('cash_registers').insert([payload]);
-    if (error) {
-      // Tenta fallback com apenas colunas essenciais do contrato
-      const fallbackPayload = {
-        id: payload.id,
-        initial_amount: payload.initial_amount,
-        status: 'ABERTO',
-        operator: payload.operator,
-        opened_at: payload.opened_at
-      };
-      const { error: err2 } = await supabase.from('cash_registers').insert([fallbackPayload]);
-      if (err2) return { success: false, error: err2.message };
+    const { error } = await supabase.from('cash_registers').insert([fullPayload]);
+    if (!error) return { success: true };
+
+    console.warn('[REGISTER OPEN] Payload completo falhou, tentando fallback 1:', error.message);
+
+    const fallback1 = {
+      id,
+      store_id: params.storeId || null,
+      operator: params.openedBy || 'Operador',
+      initial_amount: initialAmount,
+      opening_balance: initialAmount,
+      status: 'ABERTO',
+      opened_at: openedAt
+    };
+    const { error: err1 } = await supabase.from('cash_registers').insert([fallback1]);
+    if (!err1) return { success: true };
+
+    console.warn('[REGISTER OPEN] Fallback 1 falhou, tentando fallback 2:', err1.message);
+
+    const fallback2 = {
+      id,
+      store_id: params.storeId || null,
+      initial_amount: initialAmount,
+      status: 'ABERTO',
+      opened_at: openedAt
+    };
+    const { error: err2 } = await supabase.from('cash_registers').insert([fallback2]);
+    if (err2) {
+      console.error('[REGISTER OPEN] Erro ao abrir caixa:', err2.message);
+      return { success: false, error: err2.message };
     }
     return { success: true };
   },
@@ -83,7 +108,6 @@ export const registerService = {
   async close(params: { id: string; closedBy: string; finalValue: number; observations?: string; storeId?: string; openedAt?: string; initialAmount?: number }) {
     if (!supabase) throw new Error('Supabase não configurado');
 
-    // 1. Calcula os dados do caixa para determinar o expected_cash_amount
     let expectedCash = 0;
     if (params.openedAt) {
       const data = await this.getData({ storeId: params.storeId || '', openedAt: params.openedAt });
@@ -112,7 +136,33 @@ export const registerService = {
       .update(payload)
       .eq('id', params.id);
 
-    if (error) return { success: false, error: error.message };
+    if (error) {
+      console.warn('[REGISTER CLOSE] Erro no update completo, tentando fallback 1:', error.message);
+      const fallback1 = {
+        status: 'FECHADO',
+        closed_at: new Date().toISOString(),
+        final_cash_amount: Number(params.finalValue || 0),
+        operator: params.closedBy
+      };
+      const { error: err1 } = await supabase
+        .from('cash_registers')
+        .update(fallback1)
+        .eq('id', params.id);
+
+      if (err1) {
+        console.warn('[REGISTER CLOSE] Fallback 1 falhou, tentando fallback 2:', err1.message);
+        const fallback2 = {
+          status: 'FECHADO',
+          closed_at: new Date().toISOString()
+        };
+        const { error: err2 } = await supabase
+          .from('cash_registers')
+          .update(fallback2)
+          .eq('id', params.id);
+
+        if (err2) return { success: false, error: err2.message };
+      }
+    }
 
     // Registra sangria automática de fechamento no livro caixa
     try {
@@ -122,7 +172,7 @@ export const registerService = {
         amount: Number(params.finalValue || 0),
         payment_method: 'DINHEIRO',
         description: `Sangria de Fechamento de Caixa por ${params.closedBy}`,
-        store_id: params.storeId,
+        store_id: params.storeId || null,
         created_at: new Date().toISOString()
       }]);
     } catch (e) {
@@ -145,11 +195,14 @@ export const registerService = {
       // 1. Busca transações financeiras desde openedAt (Livro Caixa Unificado)
       let ftQuery = supabase
         .from('financial_transactions')
-        .select('*')
-        .gte('created_at', params.openedAt);
+        .select('*');
+
+      if (params.openedAt) {
+        ftQuery = ftQuery.gte('created_at', params.openedAt);
+      }
 
       if (params.storeId) {
-        ftQuery = ftQuery.eq('store_id', params.storeId);
+        ftQuery = ftQuery.or(`store_id.eq.${params.storeId},store_id.is.null`);
       }
 
       const { data: finTrans } = await ftQuery;
@@ -157,11 +210,14 @@ export const registerService = {
       // 2. Busca vendas realizadas desde openedAt
       let salesQuery = supabase
         .from('sales')
-        .select('*')
-        .gte('created_at', params.openedAt);
+        .select('*');
+
+      if (params.openedAt) {
+        salesQuery = salesQuery.gte('created_at', params.openedAt);
+      }
 
       if (params.storeId) {
-        salesQuery = salesQuery.eq('store_id', params.storeId);
+        salesQuery = salesQuery.or(`store_id.eq.${params.storeId},store_id.is.null`);
       }
 
       const { data: sales } = await salesQuery;
@@ -169,45 +225,48 @@ export const registerService = {
       // 3. Busca despesas adicionais
       let expQuery = supabase
         .from('expenses')
-        .select('*')
-        .gte('created_at', params.openedAt);
+        .select('*');
+
+      if (params.openedAt) {
+        expQuery = expQuery.gte('created_at', params.openedAt);
+      }
 
       if (params.storeId) {
-        expQuery = expQuery.eq('store_id', params.storeId);
+        expQuery = expQuery.or(`store_id.eq.${params.storeId},store_id.is.null`);
       }
 
       const { data: expenses } = await expQuery;
 
       // 4. Mapeamento e Cálculos Financeiros
       const allTrans = finTrans || [];
-      const allSales = (sales || []).filter(s => s.status !== 'CANCELADA');
+      const allSales = (sales || []).filter(s => String(s.status).toUpperCase() !== 'CANCELADA');
       const allExpenses = expenses || [];
 
-      // Vendas por método de pagamento (combinando vendas e transações financeiras)
-      let cashSales = allSales.filter(s => s.payment_method === 'DINHEIRO').reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
-      let cardSales = allSales.filter(s => ['CREDITO', 'DEBITO', 'CARTAO', 'CARTAO_CREDITO', 'CARTAO_DEBITO'].includes(s.payment_method)).reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
-      let pixSales = allSales.filter(s => s.payment_method === 'PIX').reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
+      // Vendas por método de pagamento
+      let cashSales = allSales.filter(s => String(s.payment_method).toUpperCase() === 'DINHEIRO').reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
+      let cardSales = allSales.filter(s => ['CREDITO', 'DEBITO', 'CARTAO', 'CARTAO_CREDITO', 'CARTAO_DEBITO'].includes(String(s.payment_method).toUpperCase())).reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
+      let pixSales = allSales.filter(s => String(s.payment_method).toUpperCase() === 'PIX').reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
       const totalSales = allSales.reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
       const totalDiscounts = allSales.reduce((acc, s) => acc + Number(s.discount || 0), 0);
 
       // Soma das Manutenções em DINHEIRO
       const cashMaintenance = allTrans
-        .filter(t => (t.type === 'RECEITA_MANUTENCAO' || t.category === 'MANUTENÇÃO') && t.payment_method === 'DINHEIRO')
+        .filter(t => (String(t.type).toUpperCase() === 'RECEITA_MANUTENCAO' || String(t.category).toUpperCase() === 'MANUTENÇÃO') && String(t.payment_method).toUpperCase() === 'DINHEIRO')
         .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
       // Soma dos SUPRIMENTOS em DINHEIRO
       const cashSuprimentos = allTrans
-        .filter(t => (t.type === 'ENTRADA_SUPRIMENTO' || t.type === 'SUPRIMENTO' || t.category === 'SUPRIMENTO') && t.payment_method === 'DINHEIRO')
+        .filter(t => (['ENTRADA_SUPRIMENTO', 'SUPRIMENTO'].includes(String(t.type).toUpperCase()) || String(t.category).toUpperCase() === 'SUPRIMENTO') && String(t.payment_method).toUpperCase() === 'DINHEIRO')
         .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
       // Soma das SANGRIAS em DINHEIRO
       const cashSangrias = allTrans
-        .filter(t => (t.type === 'SAIDA_SANGRIA' || t.type === 'SANGRIA' || t.category === 'SANGRIA') && t.payment_method === 'DINHEIRO')
+        .filter(t => (['SAIDA_SANGRIA', 'SANGRIA'].includes(String(t.type).toUpperCase()) || String(t.category).toUpperCase() === 'SANGRIA') && String(t.payment_method).toUpperCase() === 'DINHEIRO')
         .reduce((acc, t) => acc + Number(t.amount || 0), 0);
 
       // Soma de DESPESAS em DINHEIRO
       const cashExpensesFromTrans = allTrans
-        .filter(t => (t.type === 'DESPESA' || t.type === 'OUTFLOW') && t.payment_method === 'DINHEIRO')
+        .filter(t => (['DESPESA', 'OUTFLOW'].includes(String(t.type).toUpperCase())) && String(t.payment_method).toUpperCase() === 'DINHEIRO')
         .reduce((acc, t) => acc + Number(t.amount || 0), 0);
       
       const directExpenses = allExpenses.reduce((acc, e) => acc + Number(e.value || 0), 0);
@@ -216,7 +275,7 @@ export const registerService = {
       // Se cashSales for 0 mas houver RECEITA_VENDA em DINHEIRO em financial_transactions
       if (cashSales === 0) {
         cashSales = allTrans
-          .filter(t => (t.type === 'RECEITA_VENDA' || t.category === 'VENDA') && t.payment_method === 'DINHEIRO')
+          .filter(t => (['RECEITA_VENDA', 'INFLOW'].includes(String(t.type).toUpperCase()) || String(t.category).toUpperCase() === 'VENDA') && String(t.payment_method).toUpperCase() === 'DINHEIRO')
           .reduce((acc, t) => acc + Number(t.amount || 0), 0);
       }
 
@@ -288,7 +347,7 @@ export const registerService = {
       const { data, error } = await supabase
         .from('cash_registers')
         .select('*')
-        .in('status', ['FECHADO', 'closed'])
+        .in('status', ['FECHADO', 'closed', 'fechado', 'CLOSED'])
         .order('closed_at', { ascending: false })
         .limit(50);
 
@@ -307,7 +366,7 @@ export const registerService = {
           opening_balance: init,
           initial_value: init,
           opened_at: d.opened_at,
-          closed_by: d.operator || d.user_name,
+          closed_by: d.closed_by || d.operator || d.user_name,
           final_cash_amount: finalVal,
           closing_balance: finalVal,
           reported_balance: finalVal,
@@ -315,8 +374,8 @@ export const registerService = {
           expected_cash_amount: Number(d.expected_cash_amount ?? 0),
           difference: Number(d.difference ?? 0),
           total_sales: finalVal,
-          observations: d.notes || d.observations,
-          notes: d.notes || d.observations,
+          observations: d.notes || d.observations || '',
+          notes: d.notes || d.observations || '',
           closed_at: d.closed_at,
           status: d.status
         };
@@ -331,33 +390,39 @@ export const registerService = {
 
     const channelName = `realtime_cash_sync_${storeId || 'all'}_${Math.random().toString(36).substring(2, 9)}`;
 
-    const channel = supabase
-      .channel(channelName)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'cash_registers' },
-        (payload) => callback(payload)
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'financial_transactions' },
-        (payload) => callback(payload)
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'sales' },
-        (payload) => callback(payload)
-      )
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'maintenance_orders' },
-        (payload) => callback(payload)
-      )
-      .subscribe();
+    try {
+      const channel = supabase
+        .channel(channelName)
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'cash_registers' },
+          (payload) => callback(payload)
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'financial_transactions' },
+          (payload) => callback(payload)
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'sales' },
+          (payload) => callback(payload)
+        )
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'maintenance_orders' },
+          (payload) => callback(payload)
+        )
+        .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+      return () => {
+        supabase.removeChannel(channel);
+      };
+    } catch (e) {
+      console.warn('[REALTIME] Falha ao inscrever canal realtime:', e);
+      return () => {};
+    }
   }
 };
+
 
