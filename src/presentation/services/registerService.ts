@@ -73,17 +73,28 @@ export const registerService = {
     const id = crypto.randomUUID();
     const openedAt = new Date().toISOString();
     const initialAmount = Number(params.initialValue || 0);
-    const storeId = params.storeId || (typeof localStorage !== 'undefined' ? localStorage.getItem('selectedStoreId') : null) || null;
-    const operator = params.openedBy || (typeof localStorage !== 'undefined' ? localStorage.getItem('vendedor') : null) || 'Operador';
 
+    let op = (params.openedBy || '').trim();
+    if (!op && typeof localStorage !== 'undefined') {
+      op = (localStorage.getItem('vendedor') || '').trim();
+    }
+    if (!op) op = 'Operador';
+
+    let sId = (params.storeId || '').trim();
+    if (!sId && typeof localStorage !== 'undefined') {
+      sId = (localStorage.getItem('selectedStoreId') || '').trim();
+    }
+    const storeId = (sId && sId !== 'undefined' && sId !== 'null') ? sId : null;
+
+    // Payload 1: Tentativa completa com todas as colunas
     const fullPayload = {
       id,
       store_id: storeId,
-      operator: operator,
-      user_name: operator,
-      opened_by: operator,
-      initial_amount: initialAmount,
+      user_name: op,
+      operator: op,
+      opened_by: op,
       opening_balance: initialAmount,
+      initial_amount: initialAmount,
       initial_value: initialAmount,
       status: 'ABERTO',
       opened_at: openedAt
@@ -94,12 +105,11 @@ export const registerService = {
 
     console.warn('[REGISTER OPEN] Payload completo falhou, tentando fallback 1:', error.message);
 
+    // Fallback 1: Apenas colunas reais com user_name garantidamente preenchido
     const fallback1 = {
       id,
       store_id: storeId,
-      operator: operator,
-      user_name: operator,
-      initial_amount: initialAmount,
+      user_name: op,
       opening_balance: initialAmount,
       status: 'ABERTO',
       opened_at: openedAt
@@ -109,12 +119,13 @@ export const registerService = {
 
     console.warn('[REGISTER OPEN] Fallback 1 falhou, tentando fallback 2:', err1.message);
 
+    // Fallback 2: Apenas colunas reais com status open e user_name preenchido
     const fallback2 = {
       id,
       store_id: storeId,
-      initial_amount: initialAmount,
+      user_name: op,
       opening_balance: initialAmount,
-      status: 'ABERTO',
+      status: 'open',
       opened_at: openedAt
     };
     const { error: err2 } = await supabase.from('cash_registers').insert([fallback2]);
@@ -122,11 +133,12 @@ export const registerService = {
 
     console.warn('[REGISTER OPEN] Fallback 2 falhou, tentando fallback 3:', err2.message);
 
+    // Fallback 3: Sem store_id mas MANTENDO user_name (NOT NULL)
     const fallback3 = {
       id,
-      store_id: storeId,
+      user_name: op,
       opening_balance: initialAmount,
-      status: 'open',
+      status: 'ABERTO',
       opened_at: openedAt
     };
     const { error: err3 } = await supabase.from('cash_registers').insert([fallback3]);
@@ -140,78 +152,81 @@ export const registerService = {
   async close(params: { id: string; closedBy: string; finalValue: number; observations?: string; storeId?: string; openedAt?: string; initialAmount?: number }) {
     if (!supabase) throw new Error('Supabase não configurado');
 
-    let expectedCash = 0;
-    if (params.openedAt) {
-      const data = await this.getData({ storeId: params.storeId || '', openedAt: params.openedAt });
-      const initVal = Number(params.initialAmount || 0);
-      expectedCash = initVal + data.totals.cashSales + data.totals.cashMaintenance + data.totals.cashSuprimentos - data.totals.cashSangrias - data.totals.cashExpenses;
-    } else {
-      expectedCash = Number(params.finalValue || 0);
-    }
+    const finalVal = Number(params.finalValue || 0);
+    const closedAt = new Date().toISOString();
+    const closedBy = (params.closedBy || (typeof localStorage !== 'undefined' ? localStorage.getItem('vendedor') : null) || 'Operador').trim();
 
-    const difference = Number((params.finalValue - expectedCash).toFixed(2));
-
-    const payload = {
+    // Payload 1: apenas colunas reais da tabela (closing_balance, reported_balance, notes, status, closed_at)
+    const payload1 = {
       status: 'FECHADO',
-      closed_at: new Date().toISOString(),
-      final_cash_amount: Number(params.finalValue || 0),
-      closing_balance: Number(params.finalValue || 0),
-      reported_balance: Number(params.finalValue || 0),
-      expected_cash_amount: expectedCash,
-      difference: difference,
-      operator: params.closedBy,
-      notes: params.observations
+      closed_at: closedAt,
+      closing_balance: finalVal,
+      reported_balance: finalVal,
+      notes: params.observations || ''
     };
 
     const { error } = await supabase
       .from('cash_registers')
-      .update(payload)
+      .update(payload1)
       .eq('id', params.id);
 
-    if (error) {
-      console.warn('[REGISTER CLOSE] Erro no update completo, tentando fallback 1:', error.message);
-      const fallback1 = {
-        status: 'FECHADO',
-        closed_at: new Date().toISOString(),
-        final_cash_amount: Number(params.finalValue || 0),
-        operator: params.closedBy
-      };
-      const { error: err1 } = await supabase
-        .from('cash_registers')
-        .update(fallback1)
-        .eq('id', params.id);
-
-      if (err1) {
-        console.warn('[REGISTER CLOSE] Fallback 1 falhou, tentando fallback 2:', err1.message);
-        const fallback2 = {
-          status: 'FECHADO',
-          closed_at: new Date().toISOString()
-        };
-        const { error: err2 } = await supabase
-          .from('cash_registers')
-          .update(fallback2)
-          .eq('id', params.id);
-
-        if (err2) return { success: false, error: err2.message };
-      }
+    if (!error) {
+      this.recordSangriaFechamento(params, finalVal, closedBy);
+      return { success: true };
     }
 
-    // Registra sangria automática de fechamento no livro caixa
+    console.warn('[REGISTER CLOSE] Update 1 falhou:', error.message);
+
+    // Fallback 1: apenas closing_balance e status FECHADO
+    const fallback1 = {
+      status: 'FECHADO',
+      closed_at: closedAt,
+      closing_balance: finalVal
+    };
+    const { error: err1 } = await supabase
+      .from('cash_registers')
+      .update(fallback1)
+      .eq('id', params.id);
+
+    if (!err1) {
+      this.recordSangriaFechamento(params, finalVal, closedBy);
+      return { success: true };
+    }
+
+    console.warn('[REGISTER CLOSE] Fallback 1 falhou:', err1.message);
+
+    // Fallback 2: status = 'closed'
+    const fallback2 = {
+      status: 'closed',
+      closed_at: closedAt,
+      closing_balance: finalVal
+    };
+    const { error: err2 } = await supabase
+      .from('cash_registers')
+      .update(fallback2)
+      .eq('id', params.id);
+
+    if (err2) return { success: false, error: err2.message };
+
+    this.recordSangriaFechamento(params, finalVal, closedBy);
+    return { success: true };
+  },
+
+  async recordSangriaFechamento(params: any, finalVal: number, closedBy: string) {
+    if (!supabase) return;
     try {
       await supabase.from('financial_transactions').insert([{
         id: crypto.randomUUID(),
         type: 'SAIDA_SANGRIA',
-        amount: Number(params.finalValue || 0),
+        amount: finalVal,
         payment_method: 'DINHEIRO',
-        description: `Sangria de Fechamento de Caixa por ${params.closedBy}`,
+        description: `Sangria de Fechamento de Caixa por ${closedBy}`,
         store_id: params.storeId || null,
         created_at: new Date().toISOString()
       }]);
     } catch (e) {
-      console.warn('[CLOSE REGISTER] Erro ao gravar sangria no livro caixa:', e);
+      console.warn('[CLOSE REGISTER] Aviso sangria:', e);
     }
-
-    return { success: true };
   },
 
   async getData(params: { storeId: string; openedAt: string }) {
