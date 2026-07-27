@@ -262,6 +262,55 @@ export const saleService = {
     } catch (e) {
       return [];
     }
+  },
+
+  async getAll() {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase
+        .from('sales')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data || [];
+    } catch (e) {
+      console.error('[SALES SERVICE] Erro ao buscar vendas:', e);
+      return [];
+    }
+  },
+
+  async update(updatedSale: any) {
+    if (!supabase) throw new Error('Supabase não configurado');
+    try {
+      const payload = {
+        store_id: updatedSale.store_id || null,
+        vendedor: updatedSale.vendedor || updatedSale.seller_name,
+        payment_method: updatedSale.payment_method,
+        discount: Number(updatedSale.discount || 0),
+        total: Number(updatedSale.total || 0),
+        total_amount: Number(updatedSale.total || 0),
+        customer_id: updatedSale.customer_id || null,
+        items: typeof updatedSale.items === 'string' ? updatedSale.items : JSON.stringify(updatedSale.items || []),
+        edited: 1,
+        created_at: updatedSale.created_at || new Date().toISOString()
+      };
+
+      const { error } = await supabase
+        .from('sales')
+        .update(payload)
+        .eq('id', updatedSale.id);
+
+      if (error) return { success: false, error: error.message };
+
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async delete(saleId: string) {
+    return this.cancel(saleId);
   }
 };
+
 

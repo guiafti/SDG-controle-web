@@ -54,3 +54,48 @@ export const settingService = {
     return { success: true };
   }
 };
+
+export const customSuggestionService = {
+  async getAll() {
+    if (!supabase) return [];
+    try {
+      const { data, error } = await supabase.from('custom_suggestions').select('*');
+      if (error) return [];
+      return data || [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async save(suggestion: { field: string; value: string }) {
+    if (!supabase) throw new Error('Supabase não configurado');
+    try {
+      const { error } = await supabase.from('custom_suggestions').upsert({
+        id: crypto.randomUUID(),
+        field: suggestion.field,
+        value: suggestion.value,
+        created_at: new Date().toISOString()
+      });
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  },
+
+  async delete(suggestion: { field: string; value: string }) {
+    if (!supabase) throw new Error('Supabase não configurado');
+    try {
+      const { error } = await supabase
+        .from('custom_suggestions')
+        .delete()
+        .eq('field', suggestion.field)
+        .eq('value', suggestion.value);
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    } catch (e: any) {
+      return { success: false, error: e.message };
+    }
+  }
+};
+

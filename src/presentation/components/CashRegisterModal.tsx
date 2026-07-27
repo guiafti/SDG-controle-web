@@ -12,12 +12,14 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
   
   // Opening state
   const [openingBalance, setOpeningBalance] = useState('0');
+  const [openingPin, setOpeningPin] = useState('');
   
   // Closing state
   const [totals, setTotals] = useState<any>(null);
   const [topProducts, setTopProducts] = useState<any[]>([]);
   const [salesByEmployee, setSalesByEmployee] = useState<any[]>([]);
   const [reportedBalance, setReportedBalance] = useState('');
+  const [closingPinInput, setClosingPinInput] = useState('');
   const [notes, setNotes] = useState('');
 
   const fetchRegister = async () => {
@@ -62,6 +64,7 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
     const val = parseFloat(openingBalance);
     if (isNaN(val) || val < 0) return toast.error('Informe um valor inicial válido');
     
+    const pin = openingPin.trim();
     const effectiveStoreId = storeId || (typeof localStorage !== 'undefined' ? localStorage.getItem('selectedStoreId') : '') || '';
     const effectiveUserName = userName || (typeof localStorage !== 'undefined' ? localStorage.getItem('vendedor') : 'Operador') || 'Operador';
 
@@ -70,11 +73,13 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
       const res = await registerService.open({
         storeId: effectiveStoreId,
         openedBy: effectiveUserName,
-        initialValue: val
+        initialValue: val,
+        closingPin: pin
       });
       
       if (res.success) {
         toast.success('CAIXA ABERTO COM SUCESSO!', { id: loadingId });
+        setOpeningPin('');
         await fetchRegister();
       } else {
         toast.error(`Erro ao abrir caixa: ${res.error || 'Falha no banco'}`, { id: loadingId });
@@ -121,12 +126,15 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
     setTotals(data.totals || data); 
     setTopProducts(data.topProducts || []);
     setSalesByEmployee(data.salesByEmployee || []);
+    setClosingPinInput('');
     setView('closing');
   };
 
   const handleClose = async () => {
     const reported = parseFloat(reportedBalance);
     if (isNaN(reported)) return toast.error('Informe o valor contado na gaveta');
+
+    const pin = closingPinInput.trim();
 
     const loadingId = toast.loading('Encerrando dia e gerando sangria...');
     try {
@@ -137,7 +145,8 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
         observations: notes,
         storeId,
         openedAt: currentRegister.opened_at,
-        initialAmount: currentRegister.initial_amount || currentRegister.opening_balance
+        initialAmount: currentRegister.initial_amount || currentRegister.opening_balance,
+        closingPin: pin
       });
 
       if (res.success) {
@@ -152,7 +161,7 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
         onStatusChange?.(false);
         onClose();
       } else {
-        toast.error('Erro ao fechar caixa', { id: loadingId });
+        toast.error(res.error || 'Erro ao fechar caixa', { id: loadingId });
       }
     } catch (e: any) {
       toast.error('Falha na comunicação', { id: loadingId });
@@ -195,15 +204,31 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
                     <div className="w-12 h-12 bg-blue-500 text-white rounded-xl flex items-center justify-center text-2xl"><i className="ph ph-door-open"></i></div>
                     <div>
                       <h4 className="font-black text-blue-900 uppercase text-xs">Abrir Novo Caixa</h4>
-                      <p className="text-blue-500 text-[10px] font-bold">Informe o valor inicial na gaveta</p>
+                      <p className="text-blue-500 text-[10px] font-bold">Informe o saldo inicial e a senha de fechamento</p>
                     </div>
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">Saldo Inicial (Troco)</label>
                     <input 
                       type="number" step="0.01" value={openingBalance} onChange={e => setOpeningBalance(e.target.value)}
-                      className="w-full p-5 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-brand-500 font-black text-2xl text-slate-700"
+                      className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl outline-none focus:border-brand-500 font-black text-2xl text-slate-700"
                     />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-2 block flex items-center gap-1">
+                      <span>🔒 Senha de Fechamento (4 Dígitos Numéricos)</span>
+                    </label>
+                    <input 
+                      type="password"
+                      maxLength={4}
+                      value={openingPin} 
+                      onChange={e => setOpeningPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      className="w-full p-4 bg-blue-50/50 border-2 border-blue-200 rounded-2xl outline-none focus:border-blue-500 font-black text-xl tracking-[0.5em] text-center text-slate-800"
+                      placeholder="****"
+                    />
+                    <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase italic">
+                      ⚠️ Guarde este código de 4 dígitos. Apenas com ele será possível fechar este caixa.
+                    </p>
                   </div>
                   <button onClick={handleOpen} className="w-full py-5 bg-brand-600 text-white font-black rounded-2xl hover:bg-brand-700 shadow-xl shadow-brand-500/30 transition-all uppercase text-sm italic">
                     ABRIR CAIXA AGORA
@@ -282,6 +307,23 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
                       />
                       <p className="text-[8px] font-bold text-slate-400 mt-1 uppercase italic">* Este valor será registrado como Sangria no financeiro</p>
                     </div>
+
+                    {currentRegister?.closing_pin && (
+                      <div>
+                        <label className="text-[10px] font-black text-red-600 uppercase tracking-widest mb-1 block flex items-center gap-1">
+                          <span>🔑 Senha de Fechamento (4 Dígitos)</span>
+                        </label>
+                        <input 
+                          type="password"
+                          maxLength={4}
+                          value={closingPinInput} 
+                          onChange={e => setClosingPinInput(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                          className="w-full p-4 bg-red-50/50 border-2 border-red-200 rounded-2xl outline-none focus:border-red-500 font-black text-xl tracking-[0.5em] text-center text-slate-800"
+                          placeholder="****"
+                        />
+                      </div>
+                    )}
+
                     <div>
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1 block">Observações do Fechamento</label>
                       <textarea 

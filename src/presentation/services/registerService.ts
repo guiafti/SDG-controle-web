@@ -59,6 +59,7 @@ export const registerService = {
         total_sales: Number(dataObj.closing_balance || dataObj.total_sales || 0),
         observations: dataObj.notes || dataObj.observations || '',
         notes: dataObj.notes || dataObj.observations || '',
+        closing_pin: dataObj.closing_pin || dataObj.pin || null,
         closed_at: dataObj.closed_at,
         status: dataObj.status
       };
@@ -68,8 +69,13 @@ export const registerService = {
     }
   },
 
-  async open(params: { storeId: string; openedBy: string; initialValue: number }) {
+  async open(params: { storeId: string; openedBy: string; initialValue: number; closingPin?: string }) {
     if (!supabase) throw new Error('Supabase não configurado');
+    const pinStr = String(params.closingPin || '').trim();
+    if (pinStr && !/^\d{4}$/.test(pinStr)) {
+      return { success: false, error: 'A senha de fechamento deve conter exatamente 4 dígitos numéricos!' };
+    }
+
     const id = crypto.randomUUID();
     const openedAt = new Date().toISOString();
     const initialAmount = Number(params.initialValue || 0);
@@ -86,6 +92,19 @@ export const registerService = {
     }
     const storeId = (sId && sId !== 'undefined' && sId !== 'null') ? sId : null;
 
+    // Encerra qualquer caixa aberto anteriormente na mesma loja para evitar duplicidade
+    if (storeId) {
+      try {
+        await supabase
+          .from('cash_registers')
+          .update({ status: 'FECHADO', closed_at: openedAt })
+          .eq('store_id', storeId)
+          .in('status', ['ABERTO', 'open', 'aberto', 'OPEN']);
+      } catch (e) {
+        console.warn('[REGISTER OPEN] Aviso ao fechar caixas anteriores:', e);
+      }
+    }
+
     // Payload 1: Tentativa completa com todas as colunas
     const fullPayload = {
       id,
@@ -96,6 +115,7 @@ export const registerService = {
       opening_balance: initialAmount,
       initial_amount: initialAmount,
       initial_value: initialAmount,
+      closing_pin: pinStr || null,
       status: 'ABERTO',
       opened_at: openedAt
     };
@@ -111,6 +131,7 @@ export const registerService = {
       store_id: storeId,
       user_name: op,
       opening_balance: initialAmount,
+      closing_pin: pinStr || null,
       status: 'ABERTO',
       opened_at: openedAt
     };
@@ -125,6 +146,7 @@ export const registerService = {
       store_id: storeId,
       user_name: op,
       opening_balance: initialAmount,
+      closing_pin: pinStr || null,
       status: 'open',
       opened_at: openedAt
     };
@@ -138,6 +160,7 @@ export const registerService = {
       id,
       user_name: op,
       opening_balance: initialAmount,
+      closing_pin: pinStr || null,
       status: 'ABERTO',
       opened_at: openedAt
     };
@@ -149,8 +172,23 @@ export const registerService = {
     return { success: true };
   },
 
-  async close(params: { id: string; closedBy: string; finalValue: number; observations?: string; storeId?: string; openedAt?: string; initialAmount?: number }) {
+  async close(params: { id: string; closedBy: string; finalValue: number; observations?: string; storeId?: string; openedAt?: string; initialAmount?: number; closingPin?: string }) {
     if (!supabase) throw new Error('Supabase não configurado');
+
+    // Validação da Senha de Fechamento se houver no caixa cadastrado
+    const { data: currentReg } = await supabase
+      .from('cash_registers')
+      .select('closing_pin, pin')
+      .eq('id', params.id)
+      .maybeSingle();
+
+    const expectedPin = currentReg?.closing_pin || currentReg?.pin;
+    if (expectedPin) {
+      const pinStr = String(params.closingPin || '').trim();
+      if (pinStr !== String(expectedPin).trim()) {
+        return { success: false, error: 'Senha de fechamento incorreta! Digite a senha de 4 dígitos criada na abertura.' };
+      }
+    }
 
     const finalVal = Number(params.finalValue || 0);
     const closedAt = new Date().toISOString();

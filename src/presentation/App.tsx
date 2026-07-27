@@ -19,7 +19,10 @@ import CRM from './pages/CRM';
 import Analytics from './pages/Analytics';
 import NetworkManagement from './pages/NetworkManagement';
 import Processes from './pages/Processes';
+import SalesHistory from './pages/SalesHistory';
+import WhatsAppControl from './pages/WhatsAppControl';
 import { CartItem } from '../domain/CartItem';
+
 import { usePrinter } from './hooks/usePrinter';
 
 import TitleBar from './components/TitleBar';
@@ -349,14 +352,16 @@ const App: React.FC = () => {
   const renderAdminView = () => {
     switch (adminSubView) {
       case 'dashboard': return <Dashboard onNavigate={setAdminSubView} userRole={userRole} />;
-      case 'inventory': return <Inventory role={userRole} />;
+      case 'inventory': return <Inventory role={userRole} userName={vendedor} />;
       case 'settings': return <Settings />;
       case 'repairs': return <Repairs />;
-      case 'financeiro': return <FinancialControl />;
+      case 'financeiro': return <FinancialControl role={userRole} vendedor={vendedor} />;
       case 'crm': return <CRM />;
       case 'analytics': return <Analytics />;
       case 'network': return <NetworkManagement currentUser={{ id: '', name: vendedor, role: userRole }} currentStoreId={lojaId} />;
       case 'processes': return <Processes currentUser={{ id: '', name: vendedor, role: userRole }} currentStoreId={lojaId} />;
+      case 'vendas': return <SalesHistory userRole={userRole} currentUser={currentUser} />;
+      case 'whatsapp': return <WhatsAppControl />;
       default: return <Dashboard onNavigate={setAdminSubView} userRole={userRole} />;
     }
   };
@@ -413,7 +418,9 @@ const App: React.FC = () => {
                   adminSubView === 'crm' ? 'CRM - Gestão de Clientes' : 
                   adminSubView === 'analytics' ? 'Análise Preditiva' : 
                   adminSubView === 'network' ? 'HUB DE GESTÃO DE REDE - CONTROLE PROFISSIONAL' : 
-                  adminSubView === 'processes' ? 'Gestão de Processos' : 'Operação Interna'
+                  adminSubView === 'processes' ? 'Gestão de Processos' : 
+                  adminSubView === 'vendas' ? 'Vendas & Histórico de Produtos' : 
+                  adminSubView === 'whatsapp' ? 'WhatsApp & Inteligência Artificial' : 'Operação Interna'
                 } 
                 userPhoto={currentUser?.photo_url}
               />
@@ -423,6 +430,7 @@ const App: React.FC = () => {
         )}
       </div>
     </div>
+
   );
 };
 

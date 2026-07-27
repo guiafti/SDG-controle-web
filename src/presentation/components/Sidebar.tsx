@@ -76,6 +76,14 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onSwitchView, onOpenPDV, 
           </button>
 
           <button 
+            onClick={() => onSwitchView('vendas')}
+            className={`nav-btn w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${activeView === 'vendas' ? 'bg-white/10 text-white border border-white/5 shadow-inner' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+          >
+            <i className="ph ph-receipt text-xl"></i>
+            Vendas & Histórico
+          </button>
+
+          <button 
             onClick={() => onSwitchView('inventory')}
             className={`nav-btn w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${activeView === 'inventory' ? 'bg-white/10 text-white border border-white/5 shadow-inner' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
           >
@@ -108,6 +116,15 @@ const Sidebar: React.FC<SidebarProps> = ({ activeView, onSwitchView, onOpenPDV, 
             <i className="ph ph-shield-check text-xl"></i>
             Minhas Missões
           </button>
+
+          <button 
+            onClick={() => onSwitchView('whatsapp')}
+            className={`nav-btn w-full flex items-center gap-3 px-4 py-2.5 rounded-xl font-bold text-xs transition-all ${activeView === 'whatsapp' ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 shadow-inner' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
+          >
+            <i className="ph ph-whatsapp-logo text-xl text-emerald-400"></i>
+            WhatsApp & IA
+          </button>
+
 
           {role === 'admin' && (
             <button 
