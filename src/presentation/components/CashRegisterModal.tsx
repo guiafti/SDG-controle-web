@@ -60,17 +60,27 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
 
   const handleOpen = async () => {
     const val = parseFloat(openingBalance);
-    if (isNaN(val)) return toast.error('Valor inválido');
+    if (isNaN(val) || val < 0) return toast.error('Informe um valor inicial válido');
     
-    const res = await registerService.open({
-      storeId,
-      openedBy: userName,
-      initialValue: val
-    });
-    
-    if (res.success) {
-      toast.success('CAIXA ABERTO!');
-      fetchRegister();
+    const effectiveStoreId = storeId || (typeof localStorage !== 'undefined' ? localStorage.getItem('selectedStoreId') : '') || '';
+    const effectiveUserName = userName || (typeof localStorage !== 'undefined' ? localStorage.getItem('vendedor') : 'Operador') || 'Operador';
+
+    const loadingId = toast.loading('Abrindo caixa no sistema...');
+    try {
+      const res = await registerService.open({
+        storeId: effectiveStoreId,
+        openedBy: effectiveUserName,
+        initialValue: val
+      });
+      
+      if (res.success) {
+        toast.success('CAIXA ABERTO COM SUCESSO!', { id: loadingId });
+        await fetchRegister();
+      } else {
+        toast.error(`Erro ao abrir caixa: ${res.error || 'Falha no banco'}`, { id: loadingId });
+      }
+    } catch (e: any) {
+      toast.error(`Falha: ${e?.message || 'Erro de comunicação'}`, { id: loadingId });
     }
   };
 

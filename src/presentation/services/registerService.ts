@@ -8,43 +8,44 @@ export const registerService = {
         .from('cash_registers')
         .select('*');
       
-      if (params.storeId) {
-        query = query.or(`store_id.eq.${params.storeId},store_id.is.null`);
+      const sId = params.storeId || (typeof localStorage !== 'undefined' ? localStorage.getItem('selectedStoreId') : null);
+      if (sId) {
+        query = query.or(`store_id.eq.${sId},store_id.is.null`);
       }
 
       const { data, error } = await query
         .in('status', ['ABERTO', 'open', 'aberto', 'OPEN'])
         .order('opened_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(1);
 
-      if (error || !data) return null;
+      if (error || !data || data.length === 0) return null;
 
-      const initialAmount = Number(data.initial_amount ?? data.opening_balance ?? data.initial_value ?? 0);
-      const finalAmount = Number(data.final_cash_amount ?? data.reported_balance ?? data.closing_balance ?? 0);
+      const dataObj = data[0];
+      const initialAmount = Number(dataObj.initial_amount ?? dataObj.opening_balance ?? dataObj.initial_value ?? 0);
+      const finalAmount = Number(dataObj.final_cash_amount ?? dataObj.reported_balance ?? dataObj.closing_balance ?? 0);
 
       return {
-        id: data.id,
-        store_id: data.store_id,
-        operator: data.operator || data.user_name || data.opened_by || 'Operador',
-        user_name: data.operator || data.user_name || data.opened_by || 'Operador',
-        opened_by: data.operator || data.user_name || data.opened_by || 'Operador',
+        id: dataObj.id,
+        store_id: dataObj.store_id,
+        operator: dataObj.operator || dataObj.user_name || dataObj.opened_by || 'Operador',
+        user_name: dataObj.operator || dataObj.user_name || dataObj.opened_by || 'Operador',
+        opened_by: dataObj.operator || dataObj.user_name || dataObj.opened_by || 'Operador',
         initial_amount: initialAmount,
         opening_balance: initialAmount,
         initial_value: initialAmount,
-        opened_at: data.opened_at || new Date().toISOString(),
-        closed_by: data.closed_by || data.operator || data.user_name,
+        opened_at: dataObj.opened_at || new Date().toISOString(),
+        closed_by: dataObj.closed_by || dataObj.operator || dataObj.user_name,
         final_cash_amount: finalAmount,
         closing_balance: finalAmount,
         reported_balance: finalAmount,
         final_value: finalAmount,
-        expected_cash_amount: Number(data.expected_cash_amount ?? 0),
-        difference: Number(data.difference ?? 0),
-        total_sales: Number(data.closing_balance || data.total_sales || 0),
-        observations: data.notes || data.observations || '',
-        notes: data.notes || data.observations || '',
-        closed_at: data.closed_at,
-        status: data.status
+        expected_cash_amount: Number(dataObj.expected_cash_amount ?? 0),
+        difference: Number(dataObj.difference ?? 0),
+        total_sales: Number(dataObj.closing_balance || dataObj.total_sales || 0),
+        observations: dataObj.notes || dataObj.observations || '',
+        notes: dataObj.notes || dataObj.observations || '',
+        closed_at: dataObj.closed_at,
+        status: dataObj.status
       };
     } catch (e) {
       console.error('[REGISTER SERVICE] Erro ao obter caixa atual:', e);
@@ -57,13 +58,15 @@ export const registerService = {
     const id = crypto.randomUUID();
     const openedAt = new Date().toISOString();
     const initialAmount = Number(params.initialValue || 0);
+    const storeId = params.storeId || (typeof localStorage !== 'undefined' ? localStorage.getItem('selectedStoreId') : null) || null;
+    const operator = params.openedBy || (typeof localStorage !== 'undefined' ? localStorage.getItem('vendedor') : null) || 'Operador';
 
     const fullPayload = {
       id,
-      store_id: params.storeId || null,
-      operator: params.openedBy || 'Operador',
-      user_name: params.openedBy || 'Operador',
-      opened_by: params.openedBy || 'Operador',
+      store_id: storeId,
+      operator: operator,
+      user_name: operator,
+      opened_by: operator,
       initial_amount: initialAmount,
       opening_balance: initialAmount,
       initial_value: initialAmount,
@@ -78,8 +81,9 @@ export const registerService = {
 
     const fallback1 = {
       id,
-      store_id: params.storeId || null,
-      operator: params.openedBy || 'Operador',
+      store_id: storeId,
+      operator: operator,
+      user_name: operator,
       initial_amount: initialAmount,
       opening_balance: initialAmount,
       status: 'ABERTO',
@@ -92,15 +96,28 @@ export const registerService = {
 
     const fallback2 = {
       id,
-      store_id: params.storeId || null,
+      store_id: storeId,
       initial_amount: initialAmount,
+      opening_balance: initialAmount,
       status: 'ABERTO',
       opened_at: openedAt
     };
     const { error: err2 } = await supabase.from('cash_registers').insert([fallback2]);
-    if (err2) {
-      console.error('[REGISTER OPEN] Erro ao abrir caixa:', err2.message);
-      return { success: false, error: err2.message };
+    if (!err2) return { success: true };
+
+    console.warn('[REGISTER OPEN] Fallback 2 falhou, tentando fallback 3:', err2.message);
+
+    const fallback3 = {
+      id,
+      store_id: storeId,
+      opening_balance: initialAmount,
+      status: 'open',
+      opened_at: openedAt
+    };
+    const { error: err3 } = await supabase.from('cash_registers').insert([fallback3]);
+    if (err3) {
+      console.error('[REGISTER OPEN] Erro fatal ao abrir caixa:', err3.message);
+      return { success: false, error: err3.message };
     }
     return { success: true };
   },
