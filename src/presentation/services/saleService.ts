@@ -13,8 +13,9 @@ export const saleService = {
       ? saleData.items
       : (typeof saleData.items === 'string' ? JSON.parse(saleData.items || '[]') : []);
 
-    // 1. Inserir na tabela 'sales'
-    const payload = {
+    // 1. Inserir na tabela 'sales' com fallbacks resilientes
+    const createdAt = new Date().toISOString();
+    const payloadFull = {
       id: newSaleId,
       total_amount: totalAmount,
       total: totalAmount,
@@ -26,11 +27,57 @@ export const saleService = {
       store_id: saleData.store_id || null,
       status: 'CONCLUIDA',
       items: typeof saleData.items === 'string' ? saleData.items : JSON.stringify(saleData.items),
-      created_at: new Date().toISOString()
+      created_at: createdAt
     };
 
-    const { error } = await supabase.from('sales').insert([payload]);
-    if (error) return { success: false, error: error.message };
+    let { error } = await supabase.from('sales').insert([payloadFull]);
+
+    if (error) {
+      console.warn('[SALE SERVICE] Erro no payload completo de venda, tentando fallback:', error.message);
+
+      // Fallback 1: sem customer_id e vendedor
+      const payloadFallback1 = {
+        id: newSaleId,
+        total_amount: totalAmount,
+        total: totalAmount,
+        discount: discount,
+        payment_method: paymentMethod,
+        seller_name: sellerName,
+        status: 'CONCLUIDA',
+        items: payloadFull.items,
+        created_at: createdAt
+      };
+      const res1 = await supabase.from('sales').insert([payloadFallback1]);
+
+      if (res1.error) {
+        // Fallback 2: legados puros
+        const payloadFallback2 = {
+          id: newSaleId,
+          total: totalAmount,
+          discount: discount,
+          payment_method: paymentMethod,
+          vendedor: sellerName,
+          store_id: saleData.store_id || null,
+          items: payloadFull.items,
+          created_at: createdAt
+        };
+        const res2 = await supabase.from('sales').insert([payloadFallback2]);
+
+        if (res2.error) {
+          // Fallback 3: minimalista essencial
+          const payloadMinimal = {
+            id: newSaleId,
+            total: totalAmount,
+            payment_method: paymentMethod,
+            created_at: createdAt
+          };
+          const resMin = await supabase.from('sales').insert([payloadMinimal]);
+          if (resMin.error) {
+            return { success: false, error: resMin.error.message };
+          }
+        }
+      }
+    }
 
     // 2. Inserir na tabela 'sale_items'
     if (items.length > 0) {

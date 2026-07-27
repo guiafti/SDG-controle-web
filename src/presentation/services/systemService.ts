@@ -1,32 +1,33 @@
 import { supabase } from './api';
 
-// Detecção de ambiente para recursos de hardware/SO
 export const isElectron = typeof window !== 'undefined' && (window as any).api !== undefined;
 
 export const systemService = {
-  async getDashboardSummary(storeId: string) {
+  async getDashboardSummary(storeId?: string) {
     if (!supabase) return { totalRevenue: 0, monthlyRevenue: 0, activeOrders: 0, lowStockItems: 0 };
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
 
-      // Vendas
-      const { data: sales } = await supabase
+      let salesQuery = supabase
         .from('sales')
-        .select('total')
-        .eq('store_id', storeId)
+        .select('*')
         .gte('created_at', todayISO);
 
-      const total = (sales || []).reduce((acc, s) => acc + (s.total || 0), 0);
+      if (storeId && storeId !== 'all') {
+        salesQuery = salesQuery.eq('store_id', storeId);
+      }
 
-      // Ordens ativas
+      const { data: sales } = await salesQuery;
+      const validSales = (sales || []).filter(s => s.status !== 'CANCELADA');
+      const total = validSales.reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
+
       const { count: activeOrders } = await supabase
         .from('maintenance_orders')
         .select('id', { count: 'exact', head: true })
-        .eq('status', 'Pendente');
+        .in('status', ['Pendente', 'Em Manutenção']);
 
-      // Itens com baixo estoque
       const lowStock = await this.getLowStockItemsCount();
 
       return {
@@ -40,11 +41,44 @@ export const systemService = {
     }
   },
 
+  async getDashboardStats(storeId?: string) {
+    if (!supabase) return { totalRevenue: 0, monthlyRevenue: 0, dailyRevenue: 0 };
+    try {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      let query = supabase.from('sales').select('*');
+      if (storeId && storeId !== 'all') {
+        query = query.eq('store_id', storeId);
+      }
+
+      const { data: sales } = await query;
+      const validSales = (sales || []).filter(s => s.status !== 'CANCELADA');
+
+      const totalRevenue = validSales.reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
+      const dailyRevenue = validSales
+        .filter(s => (s.created_at || '') >= todayStart)
+        .reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
+      const monthlyRevenue = validSales
+        .filter(s => (s.created_at || '') >= monthStart)
+        .reduce((acc, s) => acc + Number(s.total_amount ?? s.total ?? 0), 0);
+
+      return {
+        totalRevenue,
+        monthlyRevenue: monthlyRevenue || totalRevenue,
+        dailyRevenue
+      };
+    } catch (e) {
+      return { totalRevenue: 0, monthlyRevenue: 0, dailyRevenue: 0 };
+    }
+  },
+
   async getLowStockItemsCount() {
     if (!supabase) return 0;
     try {
       const { data } = await supabase.from('inventory').select('quantity, min_stock');
-      return (data || []).filter(i => i.quantity <= i.min_stock).length;
+      return (data || []).filter(i => (i.quantity || 0) <= (i.min_stock || 0)).length;
     } catch (e) {
       return 0;
     }
@@ -53,18 +87,29 @@ export const systemService = {
   async getLowStockItems() {
     if (!supabase) return [];
     try {
-      // Busca inventário e produtos separadamente para evitar erro 400 de relacionamento
       const { data: inv } = await supabase.from('inventory').select('*');
-      const { data: prods } = await supabase.from('products').select('id, name');
+      const { data: prods } = await supabase.from('products').select('id, name, stock_quantity');
 
       const prodMap = new Map((prods || []).map(p => [p.id, p.name]));
 
-      return (inv || [])
-        .filter(i => i.quantity <= i.min_stock)
-        .map(i => ({ 
-          name: prodMap.get(i.product_id) || 'Produto Desconhecido', 
-          quantity: i.quantity, 
-          min_stock: i.min_stock 
+      if (inv && inv.length > 0) {
+        return inv
+          .filter(i => (i.quantity || 0) <= (i.min_stock || 0))
+          .map(i => ({ 
+            name: prodMap.get(i.product_id) || 'Produto', 
+            quantity: i.quantity || 0, 
+            min_stock: i.min_stock || 0 
+          }))
+          .slice(0, 10);
+      }
+
+      // Fallback para tabela de produtos direta
+      return (prods || [])
+        .filter(p => Number(p.stock_quantity || 0) <= 5)
+        .map(p => ({
+          name: p.name || 'Produto',
+          quantity: Number(p.stock_quantity || 0),
+          min_stock: 5
         }))
         .slice(0, 10);
     } catch (e) { 
@@ -73,10 +118,9 @@ export const systemService = {
   },
 
   async getSyncStatus() {
-    return { pending: 0, total: 100 }; // Desativado na versão Cloud
+    return { pending: 0, total: 100 };
   },
 
-  // Window management
   minimize() {
     if (isElectron) (window as any).api.minimizeWindow();
   },
@@ -89,3 +133,4 @@ export const systemService = {
     if (isElectron) (window as any).api.closeWindow();
   },
 };
+

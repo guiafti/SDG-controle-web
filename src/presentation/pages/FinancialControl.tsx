@@ -314,19 +314,21 @@ const FinancialControl: React.FC = () => {
                             {(!summary?.ledger || summary.ledger.length === 0) ? (
                                 <tr><td colSpan={5} className="px-6 py-20 text-center text-slate-300 font-bold uppercase text-xs">Nenhum registro no fluxo de caixa</td></tr>
                             ) : summary.ledger.map((item: any) => {
-                                const isEntry = item.trans_type === 'INFLOW';
+                                const typeStr = String(item.trans_type || item.type || item.category || '').toUpperCase();
+                                const isEntry = ['RECEITA_VENDA', 'RECEITA_MANUTENCAO', 'ENTRADA_SUPRIMENTO', 'INFLOW'].includes(typeStr);
+                                const val = Number(item.value || item.amount || 0);
                                 return (
                                     <tr key={item.id} className="hover:bg-slate-50 transition-colors">
-                                        <td className="px-6 py-3.5 text-xs font-medium text-slate-500">{new Date(item.date).toLocaleDateString()}</td>
-                                        <td className="px-6 py-3.5 text-xs font-bold text-slate-800 uppercase">{item.description}</td>
+                                        <td className="px-6 py-3.5 text-xs font-medium text-slate-500">{item.date ? new Date(item.date).toLocaleDateString() : '-'}</td>
+                                        <td className="px-6 py-3.5 text-xs font-bold text-slate-800 uppercase">{item.description || 'Movimentação'}</td>
                                         <td className="px-6 py-3.5">
-                                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tight ${isEntry ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
-                                                {isEntry ? 'ENTRADA' : item.type || 'SAÍDA'}
+                                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-tight ${isEntry ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-600'}`}>
+                                                {isEntry ? 'ENTRADA' : typeStr || 'SAÍDA'}
                                             </span>
                                         </td>
-                                        <td className="px-6 py-3.5 text-[9px] font-bold text-slate-400 uppercase">{item.payment_method}</td>
+                                        <td className="px-6 py-3.5 text-[9px] font-bold text-slate-400 uppercase">{item.payment_method || 'DINHEIRO'}</td>
                                         <td className={`px-6 py-3.5 text-right font-mono font-bold text-xs ${isEntry ? 'text-emerald-600' : 'text-red-500'}`}>
-                                            {isEntry ? '+' : '-'}{item.value.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                                            {isEntry ? '+' : '-'}{val.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                         </td>
                                     </tr>
                                 );
@@ -355,10 +357,10 @@ const FinancialControl: React.FC = () => {
                                 <tr><td colSpan={5} className="px-6 py-20 text-center text-slate-300 font-bold uppercase text-xs">Nenhum fechamento de caixa registrado</td></tr>
                             ) : registers.map((reg: any) => (
                                 <tr key={reg.id} className="hover:bg-slate-50 transition-colors">
-                                    <td className="px-6 py-3.5 text-xs font-medium text-slate-500">{new Date(reg.closed_at).toLocaleString()}</td>
-                                    <td className="px-6 py-3.5 text-xs font-bold text-slate-800 uppercase">{reg.user_name}</td>
-                                    <td className="px-6 py-3.5 text-xs font-bold text-emerald-600 font-mono">R$ {reg.total_sales.toFixed(2)}</td>
-                                    <td className="px-6 py-3.5 text-xs font-bold text-red-500 font-mono">R$ {reg.reported_balance.toFixed(2)}</td>
+                                    <td className="px-6 py-3.5 text-xs font-medium text-slate-500">{reg.closed_at ? new Date(reg.closed_at).toLocaleString() : '-'}</td>
+                                    <td className="px-6 py-3.5 text-xs font-bold text-slate-800 uppercase">{reg.operator || reg.user_name || 'Operador'}</td>
+                                    <td className="px-6 py-3.5 text-xs font-bold text-emerald-600 font-mono">R$ {Number(reg.total_sales || 0).toFixed(2)}</td>
+                                    <td className="px-6 py-3.5 text-xs font-bold text-red-500 font-mono">R$ {Number(reg.final_cash_amount || reg.reported_balance || 0).toFixed(2)}</td>
                                     <td className="px-6 py-3.5 text-right">
                                         <button 
                                             onClick={() => handleViewRegisterDetail(reg)}
@@ -487,12 +489,12 @@ const FinancialControl: React.FC = () => {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-slate-50">
-                                        {reportData.sales.map((s: any) => (
+                                        {(Array.isArray(reportData?.sales) ? reportData.sales : (Array.isArray(reportData) ? reportData : [])).map((s: any) => (
                                             <tr key={s.id} className="hover:bg-slate-50 transition-colors">
-                                                <td className="px-6 py-3 text-xs font-medium text-slate-500">{new Date(s.created_at).toLocaleString()}</td>
-                                                <td className="px-6 py-3 text-xs font-black text-slate-800 uppercase italic">{s.vendedor}</td>
-                                                <td className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase">{s.payment_method}</td>
-                                                <td className="px-6 py-3 text-right font-mono font-bold text-xs text-emerald-600">R$ {s.total.toFixed(2)}</td>
+                                                <td className="px-6 py-3 text-xs font-medium text-slate-500">{s.created_at ? new Date(s.created_at).toLocaleString() : '-'}</td>
+                                                <td className="px-6 py-3 text-xs font-black text-slate-800 uppercase italic">{s.seller_name || s.vendedor || 'Operador'}</td>
+                                                <td className="px-6 py-3 text-[9px] font-bold text-slate-400 uppercase">{s.payment_method || 'DINHEIRO'}</td>
+                                                <td className="px-6 py-3 text-right font-mono font-bold text-xs text-emerald-600">R$ {Number(s.total_amount ?? s.total ?? 0).toFixed(2)}</td>
                                             </tr>
                                         ))}
                                     </tbody>
@@ -623,19 +625,19 @@ const FinancialControl: React.FC = () => {
                             <div className="space-y-2">
                                 <div className="flex justify-between p-3 bg-slate-50 rounded-xl">
                                     <span className="text-xs font-bold text-slate-500 uppercase">Fundo Inicial</span>
-                                    <span className="text-xs font-black text-slate-800">R$ {selectedRegister.opening_balance.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-slate-800">R$ {Number(selectedRegister?.initial_amount ?? selectedRegister?.opening_balance ?? 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between p-3 bg-emerald-50 rounded-xl">
                                     <span className="text-xs font-bold text-emerald-600 uppercase">Vendas Totais</span>
-                                    <span className="text-xs font-black text-emerald-700">R$ {selectedRegister.totals.sales.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-emerald-700">R$ {Number(selectedRegister?.totals?.sales ?? 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between p-3 bg-red-50 rounded-xl">
                                     <span className="text-xs font-bold text-red-500 uppercase">Saídas/Despesas</span>
-                                    <span className="text-xs font-black text-red-700">- R$ {selectedRegister.totals.expenses.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-red-700">- R$ {Number(selectedRegister?.totals?.expenses ?? 0).toFixed(2)}</span>
                                 </div>
                                 <div className="flex justify-between p-3 bg-brand-50 rounded-xl border border-brand-100">
                                     <span className="text-xs font-bold text-brand-600 uppercase">Retirada (Sangria)</span>
-                                    <span className="text-xs font-black text-brand-700">R$ {selectedRegister.reported_balance.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-brand-700">R$ {Number(selectedRegister?.final_cash_amount ?? selectedRegister?.reported_balance ?? 0).toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
@@ -645,15 +647,15 @@ const FinancialControl: React.FC = () => {
                             <div className="grid grid-cols-2 gap-2">
                                 <div className="p-3 border border-slate-100 rounded-xl">
                                     <span className="text-[9px] font-bold text-slate-400 uppercase block">Dinheiro</span>
-                                    <span className="text-xs font-black text-slate-800">R$ {selectedRegister.totals.cash.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-slate-800">R$ {Number(selectedRegister?.totals?.cashSales ?? selectedRegister?.totals?.cash ?? 0).toFixed(2)}</span>
                                 </div>
                                 <div className="p-3 border border-slate-100 rounded-xl">
                                     <span className="text-[9px] font-bold text-slate-400 uppercase block">Pix</span>
-                                    <span className="text-xs font-black text-slate-800">R$ {selectedRegister.totals.pix.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-slate-800">R$ {Number(selectedRegister?.totals?.pixSales ?? selectedRegister?.totals?.pix ?? 0).toFixed(2)}</span>
                                 </div>
                                 <div className="p-3 border border-slate-100 rounded-xl col-span-2">
                                     <span className="text-[9px] font-bold text-slate-400 uppercase block">Cartões</span>
-                                    <span className="text-xs font-black text-slate-800">R$ {selectedRegister.totals.card.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-slate-800">R$ {Number(selectedRegister?.totals?.cardSales ?? selectedRegister?.totals?.card ?? 0).toFixed(2)}</span>
                                 </div>
                             </div>
                         </div>
@@ -663,10 +665,10 @@ const FinancialControl: React.FC = () => {
                         <div>
                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Top 5 Produtos</h4>
                             <div className="space-y-2">
-                                {(selectedRegister.topProducts || []).map((p: any, i: number) => (
+                                {(selectedRegister?.topProducts || []).map((p: any, i: number) => (
                                     <div key={i} className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
-                                        <span className="text-[10px] font-bold text-slate-600 uppercase truncate pr-4">{p.nome}</span>
-                                        <span className="text-[10px] font-black text-brand-600 bg-white px-2 py-0.5 rounded shadow-sm">{p.qtd}x</span>
+                                        <span className="text-[10px] font-bold text-slate-600 uppercase truncate pr-4">{p.nome || p.name}</span>
+                                        <span className="text-[10px] font-black text-brand-600 bg-white px-2 py-0.5 rounded shadow-sm">{p.qtd || p.quantity || 0}x</span>
                                     </div>
                                 ))}
                             </div>
@@ -675,10 +677,10 @@ const FinancialControl: React.FC = () => {
                         <div>
                             <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Vendas por Funcionário</h4>
                             <div className="space-y-2">
-                                {(selectedRegister.salesByEmployee || []).map((e: any, i: number) => (
+                                {(selectedRegister?.salesByEmployee || []).map((e: any, i: number) => (
                                     <div key={i} className="flex justify-between items-center p-2 bg-slate-50 rounded-lg">
                                         <span className="text-[10px] font-bold text-slate-600 uppercase">{e.name}</span>
-                                        <span className="text-[10px] font-black text-emerald-600">R$ {e.total.toFixed(2)}</span>
+                                        <span className="text-[10px] font-black text-emerald-600">R$ {Number(e.total || 0).toFixed(2)}</span>
                                     </div>
                                 ))}
                             </div>
