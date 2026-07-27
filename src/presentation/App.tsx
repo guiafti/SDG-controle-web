@@ -133,11 +133,9 @@ const App: React.FC = () => {
 
   // --- SUPABASE REALTIME: MONITORAR STATUS DO CAIXA EM TEMPO REAL ---
   useEffect(() => {
-    if (!lojaId) return;
-
     const checkRegisterStatus = async () => {
       try {
-        const current = await registerService.getCurrent({ storeId: lojaId });
+        const current = await registerService.getCurrent({ storeId: lojaId || localStorage.getItem('selectedStoreId') || '' });
         setIsRegisterOpen(!!current);
       } catch (e) {
         console.error('Erro ao consultar caixa inicial:', e);
@@ -146,11 +144,10 @@ const App: React.FC = () => {
 
     checkRegisterStatus();
 
-    // Inscreve no Realtime para atualizações (UPDATE / INSERT) da tabela cash_registers
     const unsubscribe = registerService.subscribeToChanges((payload) => {
       console.log('[REALTIME APP] Alteração no caixa detectada:', payload);
       checkRegisterStatus();
-    }, lojaId);
+    }, lojaId || localStorage.getItem('selectedStoreId') || undefined);
 
     return () => {
       unsubscribe();

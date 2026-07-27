@@ -4,19 +4,34 @@ export const registerService = {
   async getCurrent(params: { storeId: string }) {
     if (!supabase) return null;
     try {
+      let sId = params.storeId || (typeof localStorage !== 'undefined' ? localStorage.getItem('selectedStoreId') : null);
+      if (sId === 'undefined' || sId === 'null' || !sId || String(sId).trim() === '') sId = null;
+
       let query = supabase
         .from('cash_registers')
-        .select('*');
-      
-      const sId = params.storeId || (typeof localStorage !== 'undefined' ? localStorage.getItem('selectedStoreId') : null);
+        .select('*')
+        .in('status', ['ABERTO', 'open', 'aberto', 'OPEN'])
+        .order('opened_at', { ascending: false });
+
       if (sId) {
         query = query.or(`store_id.eq.${sId},store_id.is.null`);
       }
 
-      const { data, error } = await query
-        .in('status', ['ABERTO', 'open', 'aberto', 'OPEN'])
-        .order('opened_at', { ascending: false })
-        .limit(1);
+      let { data, error } = await query.limit(1);
+
+      // Fallback: se filtro com store_id falhou ou retornou vazio, busca qualquer caixa aberto recente
+      if (error || !data || data.length === 0) {
+        if (error) console.warn('[REGISTER SERVICE] Query com store_id falhou ou vazia, buscando globalmente:', error.message);
+        const globalRes = await supabase
+          .from('cash_registers')
+          .select('*')
+          .in('status', ['ABERTO', 'open', 'aberto', 'OPEN'])
+          .order('opened_at', { ascending: false })
+          .limit(1);
+
+        data = globalRes.data;
+        error = globalRes.error;
+      }
 
       if (error || !data || data.length === 0) return null;
 
