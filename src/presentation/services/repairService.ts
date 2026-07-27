@@ -11,25 +11,27 @@ export const repairService = {
       if (error) throw error;
       return data || [];
     } catch (e) {
-      console.error('[WEB REPAIRS ERROR]', e);
+      console.error('[REPAIRS ERROR]', e);
       return [];
     }
   },
 
   async getHistory(repairId: string) {
-    // Retorna array vazio pois repair_logs não existe na nuvem do Supabase
     return [];
   },
 
-  async updateStatus(params: { id: string; status: string; current_store_id: string }) {
+  async updateStatus(params: { id: string; status: string; current_store_id?: string }) {
     if (!supabase) throw new Error('Supabase não configurado');
+    
+    const payload: any = {
+      status: params.status,
+      updated_at: new Date().toISOString()
+    };
+    if (params.current_store_id) payload.current_store_id = params.current_store_id;
+
     const { error } = await supabase
       .from('maintenance_orders')
-      .update({ 
-        status: params.status, 
-        current_store_id: params.current_store_id,
-        updated_at: new Date().toISOString()
-      })
+      .update(payload)
       .eq('id', params.id);
     
     if (error) return { success: false, error: error.message };
@@ -50,8 +52,15 @@ export const repairService = {
     return { success: true };
   },
 
-  async updatePayment(params: { id: string; payment_status: string }) {
+  async updatePayment(params: { id: string; payment_status: string; payment_method?: string }) {
     if (!supabase) throw new Error('Supabase não configurado');
+    
+    const { data: order } = await supabase
+      .from('maintenance_orders')
+      .select('*')
+      .eq('id', params.id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from('maintenance_orders')
       .update({ 
@@ -61,29 +70,54 @@ export const repairService = {
       .eq('id', params.id);
     
     if (error) return { success: false, error: error.message };
+
+    // Se o pagamento foi efetuado (paid), gera lançamento em financial_transactions
+    if (params.payment_status === 'paid' && order) {
+      try {
+        const method = params.payment_method || 'DINHEIRO';
+        const price = Number(order.price || 0);
+        if (price > 0) {
+          await supabase.from('financial_transactions').insert([{
+            id: crypto.randomUUID(),
+            type: 'RECEITA_MANUTENCAO',
+            category: 'MANUTENÇÃO',
+            amount: price,
+            payment_method: method,
+            description: `Receita OS Manutenção #${params.id.substring(0, 8)} - ${order.customer_name || 'Cliente'}`,
+            reference_id: params.id,
+            created_at: new Date().toISOString()
+          }]);
+        }
+      } catch (e) {
+        console.warn('[REPAIR SERVICE] Aviso ao gravar transação de manutenção:', e);
+      }
+    }
+
     return { success: true };
   },
 
   async save(repair: any) {
     if (!supabase) throw new Error('Supabase não configurado');
     
-    // Filtra e remove campos que não existem no Supabase antes de dar o upsert
+    const repairId = repair.id || crypto.randomUUID();
+    const price = Number(repair.price || 0);
+
     const payload = {
-      id: repair.id || crypto.randomUUID(),
-      customer_name: repair.customer_name,
-      customer_phone: repair.customer_phone,
-      device_brand: repair.device_brand,
-      device_model: repair.device_model,
-      issue_description: repair.issue_description,
-      technical_notes: repair.technical_notes,
+      id: repairId,
+      customer_name: repair.customer_name || repair.customer,
+      customer_phone: repair.customer_phone || repair.phone,
+      device_brand: repair.device_brand || repair.brand,
+      device_model: repair.device_model || repair.model,
+      issue_description: repair.issue_description || repair.problem,
+      technical_notes: repair.technical_notes || repair.notes,
       checklist: repair.checklist,
       photo_url: repair.photo_url,
-      price: Number(repair.price || 0),
+      price: price,
       entry_store_id: repair.entry_store_id,
       maintenance_store_id: repair.maintenance_store_id,
       return_store_id: repair.return_store_id,
       current_store_id: repair.current_store_id,
-      status: repair.status,
+      status: repair.status || 'Pendente',
       payment_status: repair.payment_status || 'pending',
       created_at: repair.created_at || new Date().toISOString(),
       updated_at: new Date().toISOString()
@@ -91,11 +125,29 @@ export const repairService = {
     
     const { error } = await supabase.from('maintenance_orders').upsert(payload);
     if (error) return { success: false, error: error.message };
-    return { success: true, id: payload.id };
+
+    // Se estiver pago ao salvar, garante o registro em financial_transactions
+    if (payload.payment_status === 'paid' && price > 0) {
+      try {
+        await supabase.from('financial_transactions').insert([{
+          id: crypto.randomUUID(),
+          type: 'RECEITA_MANUTENCAO',
+          category: 'MANUTENÇÃO',
+          amount: price,
+          payment_method: repair.payment_method || 'DINHEIRO',
+          description: `Receita OS Manutenção #${repairId.substring(0, 8)} - ${payload.customer_name}`,
+          reference_id: repairId,
+          created_at: new Date().toISOString()
+        }]);
+      } catch (e) {
+        console.warn('[REPAIR SERVICE] Aviso ao gravar transação no salvamento:', e);
+      }
+    }
+
+    return { success: true, id: repairId };
   },
 
   async addLog(log: { repair_id: string; action: string; user_name: string; notes?: string }) {
-    // Retorna sucesso de mentira pois repair_logs não existe na nuvem
     return { success: true };
   },
 
@@ -126,7 +178,7 @@ export const repairService = {
       const byteArray = new Uint8Array(byteNumbers);
       const blob = new Blob([byteArray], { type: 'image/jpeg' });
 
-      // Salva no bucket correto de imagens do reparo (repair-images)
+      // Salva no bucket público de imagens de reparo: repair-images
       const fileName = `repairs/${params.id}_${Date.now()}.jpg`;
       const { error } = await supabase.storage
         .from('repair-images')
@@ -138,9 +190,22 @@ export const repairService = {
         .from('repair-images')
         .getPublicUrl(fileName);
 
+      // Salva registro em maintenance_photos
+      try {
+        await supabase.from('maintenance_photos').insert([{
+          id: crypto.randomUUID(),
+          maintenance_order_id: params.id,
+          photo_url: publicUrl,
+          created_at: new Date().toISOString()
+        }]);
+      } catch (e) {
+        console.warn('[REPAIR SERVICE] Aviso ao salvar em maintenance_photos:', e);
+      }
+
       return { success: true, url: publicUrl };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   }
 };
+

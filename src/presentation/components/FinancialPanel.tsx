@@ -49,8 +49,8 @@ const FinancialPanel: React.FC<FinancialPanelProps> = ({
         let method = '';
         if (e.key === '1') method = 'PIX';
         if (e.key === '2') method = 'DINHEIRO';
-        if (e.key === '3') method = 'CARTAO_CREDITO';
-        if (e.key === '4') method = 'CARTAO_DEBITO';
+        if (e.key === '3') method = 'CREDITO';
+        if (e.key === '4') method = 'DEBITO';
 
         if (method) {
           setIsPaymentModalOpen(false);
@@ -89,14 +89,14 @@ const FinancialPanel: React.FC<FinancialPanelProps> = ({
                 </div>
                 <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-black text-sm group-hover:bg-brand-500 group-hover:text-white transition-colors">2</div>
               </div>
-              <div onClick={() => { setIsPaymentModalOpen(false); onFinish('CARTAO_CREDITO', selectedCustomer?.id); }} className="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 hover:border-brand-500 hover:bg-brand-50 cursor-pointer transition-all group">
+              <div onClick={() => { setIsPaymentModalOpen(false); onFinish('CREDITO', selectedCustomer?.id); }} className="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 hover:border-brand-500 hover:bg-brand-50 cursor-pointer transition-all group">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center"><i className="ph ph-credit-card text-lg"></i></div>
                   <span className="font-bold text-slate-700 uppercase">Cartão de Crédito</span>
                 </div>
                 <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center font-black text-sm group-hover:bg-brand-500 group-hover:text-white transition-colors">3</div>
               </div>
-              <div onClick={() => { setIsPaymentModalOpen(false); onFinish('CARTAO_DEBITO', selectedCustomer?.id); }} className="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 hover:border-brand-500 hover:bg-brand-50 cursor-pointer transition-all group">
+              <div onClick={() => { setIsPaymentModalOpen(false); onFinish('DEBITO', selectedCustomer?.id); }} className="flex items-center justify-between p-4 rounded-2xl border-2 border-slate-100 hover:border-brand-500 hover:bg-brand-50 cursor-pointer transition-all group">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center"><i className="ph ph-credit-card text-lg"></i></div>
                   <span className="font-bold text-slate-700 uppercase">Cartão de Débito</span>

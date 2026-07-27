@@ -24,6 +24,7 @@ import { usePrinter } from './hooks/usePrinter';
 
 import TitleBar from './components/TitleBar';
 import { storeService } from './services/storeService';
+import { registerService } from './services/registerService';
 import { taskService, settingService } from './services/miscService';
 import { productService } from './services/productService';
 import { saleService } from './services/saleService';
@@ -129,6 +130,32 @@ const App: React.FC = () => {
     window.addEventListener('settings-updated', handleSettingsUpdated);
     return () => window.removeEventListener('settings-updated', handleSettingsUpdated);
   }, []);
+
+  // --- SUPABASE REALTIME: MONITORAR STATUS DO CAIXA EM TEMPO REAL ---
+  useEffect(() => {
+    if (!lojaId) return;
+
+    const checkRegisterStatus = async () => {
+      try {
+        const current = await registerService.getCurrent({ storeId: lojaId });
+        setIsRegisterOpen(!!current);
+      } catch (e) {
+        console.error('Erro ao consultar caixa inicial:', e);
+      }
+    };
+
+    checkRegisterStatus();
+
+    // Inscreve no Realtime para atualizações (UPDATE / INSERT) da tabela cash_registers
+    const unsubscribe = registerService.subscribeToChanges((payload) => {
+      console.log('[REALTIME APP] Alteração no caixa detectada:', payload);
+      checkRegisterStatus();
+    }, lojaId);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [lojaId]);
 
   const handleLogin = (user: any) => {
     localStorage.setItem('vendedor', user.name);

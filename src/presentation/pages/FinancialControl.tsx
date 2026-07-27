@@ -41,6 +41,16 @@ const FinancialControl: React.FC = () => {
 
   useEffect(() => {
     fetchData();
+
+    const unsubscribe = registerService.subscribeToChanges(() => {
+      registerService.getHistory().then(regs => {
+        setRegisters(regs || []);
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, []);
 
   const fetchData = async () => {

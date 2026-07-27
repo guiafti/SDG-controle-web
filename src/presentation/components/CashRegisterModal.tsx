@@ -45,6 +45,19 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
     if (isOpen) fetchRegister();
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!storeId) return;
+
+    const unsubscribe = registerService.subscribeToChanges((payload) => {
+      console.log('[REALTIME MODAL] Alteração de caixa recebida via Supabase:', payload);
+      fetchRegister();
+    }, storeId);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [storeId]);
+
   const handleOpen = async () => {
     const val = parseFloat(openingBalance);
     if (isNaN(val)) return toast.error('Valor inválido');
@@ -111,7 +124,10 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
         id: currentRegister.id,
         closedBy: userName,
         finalValue: reported,
-        observations: notes
+        observations: notes,
+        storeId,
+        openedAt: currentRegister.opened_at,
+        initialAmount: currentRegister.initial_amount || currentRegister.opening_balance
       });
 
       if (res.success) {
@@ -135,6 +151,15 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
 
   if (!isOpen) return null;
 
+  const expectedCashCalc = (
+    Number(currentRegister?.initial_amount ?? currentRegister?.opening_balance ?? 0) +
+    Number(totals?.cashSales ?? totals?.cash ?? 0) +
+    Number(totals?.cashMaintenance ?? 0) +
+    Number(totals?.cashSuprimentos ?? 0) -
+    Number(totals?.cashSangrias ?? 0) -
+    Number(totals?.cashExpenses ?? 0)
+  );
+
   return (
     <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[300] flex items-center justify-center p-4">
       <div className="bg-white rounded-[40px] shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200">
@@ -142,7 +167,7 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
           <button onClick={onClose} className="absolute top-6 right-6 text-white/50 hover:text-white"><i className="ph ph-x text-2xl"></i></button>
           <h3 className="text-2xl font-black uppercase italic tracking-tighter">Controle de Caixa</h3>
           <p className="text-brand-100 text-[10px] font-bold uppercase tracking-widest mt-1 opacity-70">
-            {currentRegister ? `Aberto por ${currentRegister.user_name}` : 'Nenhum caixa aberto'}
+            {currentRegister ? `Aberto por ${currentRegister.user_name || currentRegister.operator}` : 'Nenhum caixa aberto'}
           </p>
         </div>
 
@@ -181,7 +206,7 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-emerald-50 p-4 rounded-3xl border border-emerald-100">
                       <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Saldo Inicial</span>
-                      <div className="text-xl font-black text-emerald-900">R$ {currentRegister.opening_balance.toFixed(2)}</div>
+                      <div className="text-xl font-black text-emerald-900">R$ {(currentRegister.initial_amount || currentRegister.opening_balance).toFixed(2)}</div>
                     </div>
                     <div className="bg-slate-50 p-4 rounded-3xl border border-slate-100">
                       <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Início do Turno</span>
@@ -220,19 +245,19 @@ const CashRegisterModal: React.FC<Props> = ({ isOpen, onClose, storeId, userName
                   <div className="grid grid-cols-2 gap-2">
                     <div className="p-3 bg-slate-50 rounded-xl">
                       <span className="text-[8px] font-bold text-slate-400 uppercase">Vendas Digitais (Pix/Cartão)</span>
-                      <div className="text-sm font-black text-slate-700">R$ {(totals.pix + totals.card).toFixed(2)}</div>
+                      <div className="text-sm font-black text-slate-700">R$ {(totals?.pixSales + totals?.cardSales || totals?.pix + totals?.card || 0).toFixed(2)}</div>
                     </div>
                     <div className="p-3 bg-slate-50 rounded-xl">
                       <span className="text-[8px] font-bold text-slate-400 uppercase">Vendas em Dinheiro</span>
-                      <div className="text-sm font-black text-slate-700">R$ {totals.cash.toFixed(2)}</div>
+                      <div className="text-sm font-black text-slate-700">R$ {(totals?.cashSales ?? totals?.cash ?? 0).toFixed(2)}</div>
                     </div>
                     <div className="p-3 bg-red-50 rounded-xl">
-                      <span className="text-[8px] font-bold text-red-400 uppercase">Total de Saídas</span>
-                      <div className="text-sm font-black text-red-600">- R$ {totals.expenses.toFixed(2)}</div>
+                      <span className="text-[8px] font-bold text-red-400 uppercase">Total de Saídas / Sangrias</span>
+                      <div className="text-sm font-black text-red-600">- R$ {(totals?.expenses ?? 0).toFixed(2)}</div>
                     </div>
                     <div className="p-3 bg-brand-50 rounded-xl border border-brand-100">
                       <span className="text-[8px] font-bold text-brand-600 uppercase tracking-tighter">Valor Esperado em Dinheiro</span>
-                      <div className="text-sm font-black text-brand-700">R$ {(currentRegister.opening_balance + totals.cash - totals.expenses).toFixed(2)}</div>
+                      <div className="text-sm font-black text-brand-700">R$ {expectedCashCalc.toFixed(2)}</div>
                     </div>
                   </div>
 

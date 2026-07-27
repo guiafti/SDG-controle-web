@@ -9,6 +9,7 @@
   },
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
     "build:ui": "vite build",
     "build:main": "npx esbuild src/main/main.ts --bundle --platform=node --external:electron --external:node-thermal-printer --external:usb --outfile=dist/main/main.js && npx esbuild src/main/preload.ts --bundle --platform=node --external:electron --outfile=dist/main/preload.js",
     "electron:dev": "npm run build:main && npx concurrently -n vite,electron -c green,blue \"npm run dev\" \"wait-on tcp:127.0.0.1:5173 && npx electron .\"",
